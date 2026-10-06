@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css?v=20261006g"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js?v=20261006g"></script><script src="js/db.js?v=20261006g"></script><script src="js/common.js?v=20261006g"></script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css?v=20261006h"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js?v=20261006h"></script><script src="js/db.js?v=20261006h"></script><script src="js/common.js?v=20261006h"></script>
 <title>Auction Vault — Mystery Vaults & Online Auctions</title>
 <meta name="description" content="Make an offer on a mystery storage vault or an auction find. Highest offer wins — pay cash at the meet-up, no cards."></head>
 <body data-page="home">
@@ -9,7 +9,7 @@
     <div class="container">
       <img class="hero-logo" src="assets/logo-crop.png" alt="Auction Vault">
       <p class="tagline">Unlock the mystery &nbsp;·&nbsp; Make an offer on the finds</p>
-      <div class="choice-grid triangle">
+      <div class="choice-grid quad">
         <a class="choice choice-auction" href="auction.html">
           <div class="icon">🔨</div>
           <h2>Enter the Auction</h2>
@@ -21,6 +21,12 @@
           <h2>Get a Storage Unit</h2>
           <p class="muted">To fit anything your heart desires. We don't care, as long as it fits. You!</p>
           <div class="go">Browse Vaults →</div>
+        </a>
+        <a class="choice choice-listing" href="listing.html" id="listing-choice">
+          <div class="icon">🏷️</div>
+          <h2>List your items</h2>
+          <p class="muted">Sell your own stuff on the Auction. Your avatar shows on every listing.</p>
+          <div class="go" data-listing-go>Sell your stuff →</div>
         </a>
         <a class="choice choice-profile" href="account.html" id="profile-choice">
           <div class="icon" data-profile-icon>👤</div>

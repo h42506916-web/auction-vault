@@ -551,6 +551,8 @@
     card.querySelector('[data-profile-icon]').innerHTML = p ? avatarHTML(p, 'xl') : '👤';
     card.querySelector('[data-profile-title]').textContent = p ? p.display_name : 'Your Profile';
     card.querySelector('[data-profile-go]').textContent = p ? 'My profile & offers →' : (acct.ready && !acct.session ? 'Sign in / join →' : 'Customise →');
+    const sell = document.querySelector('#listing-choice [data-listing-go]');
+    if (sell) sell.textContent = acct.ready && !acct.session ? 'Sign in to sell →' : 'Sell your stuff →';
   }
   function renderChip() {
     renderProfileCard();
