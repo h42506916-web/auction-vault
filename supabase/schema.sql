@@ -7,7 +7,8 @@
 -- =====================================================================
 -- After this, also run supabase/migration_002.sql (storage vault offers)
 -- and supabase/migration_003.sql (rejects joke / fake / rude buyer entries)
--- and supabase/migration_004.sql (debts / paid tracking, public top offers).
+-- and supabase/migration_004.sql (debts / paid tracking, public top offers)
+-- and supabase/migration_005.sql (buyer accounts: profiles + avatars on offers).
 
 create extension if not exists pgcrypto;  -- gen_random_uuid() (already on in Supabase)
 

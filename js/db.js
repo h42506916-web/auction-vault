@@ -35,6 +35,13 @@
     const m = String((e && e.message) || e || '');
     if (/not set up|database library/i.test(m)) return m;
     if (/invalid_entry/i.test(m)) return 'Invalid — please enter your real name';
+    const code = (e && e.code) || '';
+    if (code === 'invalid_credentials' || /invalid login credentials/i.test(m)) return 'Wrong username or password.';
+    if (code === 'user_already_exists' || /already registered/i.test(m)) return 'That username is taken — try another, or sign in.';
+    if (code === 'email_address_invalid' || code === 'signup_disabled' || /email address .* is invalid|signups? not allowed/i.test(m)) return ACCOUNTS_OFF;
+    if (code === 'weak_password' || /password should/i.test(m)) return 'Please choose a longer password (at least 6 characters).';
+    if (/database error saving new user/i.test(m)) return "That username isn't allowed — please pick another.";
+    if (code === 'over_request_rate_limit' || /rate limit|too many/i.test(m)) return 'Too many tries — please wait a minute and try again.';
     if (/Failed to fetch|NetworkError|Load failed|abort|timed? ?out|network/i.test(m)) return "We couldn't reach the shop's server. Please check your internet connection and try again.";
     if (/JWT|permission|row-level|not authori[sz]ed|42501/i.test(m)) return 'You are not allowed to do that. Please sign in again.';
     return m || 'Something went wrong. Please try again.';
@@ -42,6 +49,9 @@
 
   // A function added by a migration that has not been run yet (PostgREST: PGRST202 / 404)
   const missingFn = err => /PGRST202|42883/.test(err.code || '') || /could not find the function|does not exist|schema cache/i.test(err.message || '');
+  const ACCOUNTS_OFF = "Accounts aren't switched on yet — please try again later.";
+  const ACCOUNT_DOMAIN = 'auctionvault.local';
+  const PROFILE_COLS = 'id,username,display_name,avatar_emoji,avatar_color';
   const MIGRATION_004 = 'Paid tracking is not set up yet. Run supabase/migration_004.sql in the Supabase SQL Editor, then try again.';
 
   const num = v => (v == null ? 0 : Number(v));
@@ -77,8 +87,10 @@
       const rows = check(await sb().from('storage_tiers').select('*').eq('active', true).order('sort', { ascending: true }));
       return rows.map(tierFromRow);
     },
+    // Offer history; username / avatar come from supabase/migration_005.sql (absent before it runs)
     async itemBids(id) {
-      return check(await sb().rpc('item_bids', { p_item_id: id })).map(b => ({ amount: num(b.amount), by: b.bidder_name, at: Date.parse(b.created_at) }));
+      return check(await sb().rpc('item_bids', { p_item_id: id })).map(b => ({ amount: num(b.amount), by: b.bidder_name, at: Date.parse(b.created_at),
+        username: b.username || '', emoji: b.avatar_emoji || '', color: b.avatar_color || '' }));
     },
 
     // Highest offer per item: { [itemId]: { amount, by, at } }. Uses top_offers() (migration_004.sql);
@@ -87,7 +99,8 @@
       const out = {};
       const res = await sb().rpc('top_offers');
       if (!res.error) {
-        (res.data || []).forEach(r => { out[r.item_id] = { amount: num(r.amount), by: r.bidder_name || 'Anonymous', at: Date.parse(r.created_at) }; });
+        (res.data || []).forEach(r => { out[r.item_id] = { amount: num(r.amount), by: r.bidder_name || 'Anonymous', at: Date.parse(r.created_at),
+          username: r.username || '', emoji: r.avatar_emoji || '', color: r.avatar_color || '' }; });
         return out;
       }
       if (!missingFn(res.error)) check(res);
@@ -119,6 +132,37 @@
         p_tier_id: p.itemId, p_amount: p.price, p_buyer_name: p.name, p_class: p.cls || '', p_contact: p.contact || '',
         p_meetup: p.meetup, p_time: p.time, p_reference: p.id
       }));
+    },
+
+    /* ----- buyer accounts (username + password; supabase/migration_005.sql) -----
+       The username becomes the login email <username>@auctionvault.local (never emailed). */
+    account: {
+      domain: ACCOUNT_DOMAIN, ACCOUNTS_OFF,
+      emailFor: u => String(u || '').trim().toLowerCase() + '@' + ACCOUNT_DOMAIN,
+      usernameOf: email => { const m = /^([a-z0-9_]+)@auctionvault\.local$/i.exec(email || ''); return m ? m[1].toLowerCase() : ''; },
+      // true once the profiles table exists (cached for 5 minutes)
+      async ready() {
+        try { const c = JSON.parse(sessionStorage.getItem('av_acct_ready') || 'null'); if (c && Date.now() - c.t < 300000) return c.v; } catch (e) {}
+        const res = await sb().from('profiles').select('id').limit(1);
+        let v = true;
+        if (res.error) {
+          if (/42P01|PGRST205|PGRST204/.test(res.error.code || '') || /does not exist|could not find the table|schema cache/i.test(res.error.message || '')) v = false;
+          else check(res);
+        }
+        try { sessionStorage.setItem('av_acct_ready', JSON.stringify({ v, t: Date.now() })); } catch (e) {}
+        return v;
+      },
+      async usernameAvailable(u) { return check(await sb().rpc('username_available', { p_username: u })); },
+      async signUp(username, password) {
+        const data = check(await sb().auth.signUp({ email: db.account.emailFor(username), password, options: { data: { username } } }));
+        if (!data.session) throw new Error(ACCOUNTS_OFF); // "Confirm email" is still on in Supabase
+        return data;
+      },
+      async signIn(username, password) { return check(await sb().auth.signInWithPassword({ email: db.account.emailFor(username), password })); },
+      async profile(uid) { return check(await sb().from('profiles').select(PROFILE_COLS).eq('id', uid).maybeSingle()); },
+      async saveProfile(p) {
+        return check(await sb().rpc('save_profile', { p_display_name: p.display_name, p_avatar_emoji: p.avatar_emoji, p_avatar_color: p.avatar_color, p_username: p.username || null }));
+      }
     },
 
     /* ----- auth (seller) ----- */

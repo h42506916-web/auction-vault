@@ -3,7 +3,7 @@
    No cards or online payments anywhere: buyers make an offer, highest offer wins, cash at the meet-up. */
 (function () {
   'use strict';
-  const KEYS = { pickups: 'av_pickups_v1', buyer: 'av_buyer_v1', myBids: 'av_my_bids_v1' };
+  const KEYS = { pickups: 'av_pickups_v1', buyer: 'av_buyer_v1', myBids: 'av_my_bids_v1', profile: 'av_profile_v1' };
   const SECRET_CODE = 'SCOUT TROOPER!'; // Only a shortcut to seller.html — the dashboard itself needs an email sign-in.
   const OWNER_PHONE = '455982359';
   const HOUR = 3600 * 1000;
@@ -296,7 +296,8 @@
     const isBid = offer.type === 'Highest bid';
     const isFull = offer.type === 'Buy It Now';
     const prevVault = isVault ? getPickups().find(p => p.itemId === offer.itemId && p.type === 'Vault offer' && !p.collected) : null;
-    const st = { i: 0, name: saved.name || '', cls: saved.cls || '', contact: saved.contact || '', meetup: '', time: '',
+    const prof = acct.session && acct.profile;
+    const st = { i: 0, name: (prof && prof.display_name) || saved.name || '', cls: saved.cls || '', contact: saved.contact || '', meetup: '', time: '',
       amount: isVault ? (prevVault ? Number(prevVault.price) : null) : Number(offer.price), done: false, rejected: null };
     const STEPS = isVault
       ? [['offer', 'Your offer'], ['meetup', 'Meet-up point'], ['time', 'Time'], ['confirm', 'Reminder']]
@@ -499,6 +500,67 @@
     render();
   }
 
+  /* ---------- Buyer accounts: avatar (emoji on a coloured circle) + display name ----------
+     Must match the lists in supabase/migration_005.sql (public.profile_problem). */
+  const AVATAR_EMOJIS = ["😀", "😎", "🤠", "🥳", "🤖", "👽", "👻", "🦊", "🐱", "🐶", "🐼", "🐸", "🦁", "🐯", "🐵", "🦄", "🐙", "🦖", "🐝", "🌵", "🍕", "⚽", "🎮", "🚀"];
+  const AVATAR_COLORS = ["#0b2a5b", "#1e88e5", "#00897b", "#43a047", "#f9a825", "#fb8c00", "#e53935", "#d81b60", "#8e24aa", "#546e7a"];
+  // a: { emoji, color, name } (profile or offer). Offers made before accounts show the name's first letter.
+  function avatarHTML(a, size) {
+    a = a || {};
+    const emoji = a.emoji || a.avatar_emoji, color = a.color || a.avatar_color;
+    const name = a.name || a.display_name || a.by || '';
+    const cls = 'avatar' + (size ? ' ' + size : '') + (emoji ? '' : ' plain');
+    const inner = emoji ? esc(emoji) : esc((name.trim()[0] || '?').toUpperCase());
+    return `<span class="${cls}" style="--av:${/^#[0-9a-f]{6}$/i.test(color || '') ? color : '#8A8D91'}" aria-hidden="true">${inner}</span>`;
+  }
+  const acct = { checked: false, ready: false, session: null, profile: null };
+  const acctListeners = [];
+  function onAccount(fn) { acctListeners.push(fn); if (acct.checked) fn(acct); }
+  function emitAccount() { acct.checked = true; renderChip(); acctListeners.forEach(fn => { try { fn(acct); } catch (e) { console.error(e); } }); }
+  function accountURL(mode) {
+    const here = location.pathname.split('/').pop() + location.search;
+    return 'account.html' + (mode ? '?mode=' + mode + '&' : '?') + 'next=' + encodeURIComponent(here || 'index.html');
+  }
+  async function refreshAccount(session) {
+    acct.session = session || null;
+    const uid = session && session.user && session.user.id;
+    if (!uid) { acct.profile = null; write(KEYS.profile, null); return emitAccount(); }
+    const cached = read(KEYS.profile, null);
+    if (cached && cached.id === uid && !acct.profile) { acct.profile = cached; emitAccount(); }
+    try { acct.profile = await AV.db.account.profile(uid); write(KEYS.profile, acct.profile); }
+    catch (e) { console.warn('Profile unavailable', e); }
+    emitAccount();
+  }
+  function setProfile(p) { acct.profile = p || null; write(KEYS.profile, acct.profile); emitAccount(); }
+  async function initAccount() {
+    if (!(window.AV && AV.db && AV.db.configured())) return;
+    try {
+      acct.ready = await AV.db.account.ready();
+      if (!acct.ready) return emitAccount(); // migration_005 not run yet: no accounts, offers work as before
+      await refreshAccount(await AV.db.getSession());
+      AV.db.onAuth((evt, s) => setTimeout(() => {
+        const was = acct.session && acct.session.user.id, now = s && s.user.id;
+        if (was !== now) refreshAccount(s); else acct.session = s;
+      }, 0));
+    } catch (e) { console.warn('Accounts unavailable', e); emitAccount(); }
+  }
+  function renderChip() {
+    const el = document.getElementById('acct-chip'); if (!el) return;
+    if (!acct.ready) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const p = acct.profile;
+    if (acct.session && p) {
+      el.href = 'account.html'; el.title = 'Your profile';
+      el.innerHTML = `${avatarHTML(p)}<span class="acct-name">${esc(p.display_name)}</span>`;
+    } else if (acct.session) {
+      el.href = 'account.html'; el.title = 'Finish your profile';
+      el.innerHTML = `${avatarHTML({ name: '?' })}<span class="acct-name">Finish profile</span>`;
+    } else {
+      el.href = accountURL(); el.title = 'Sign in or create an account';
+      el.innerHTML = '<span class="acct-name">Sign in</span>';
+    }
+  }
+
   /* ---------- Secret code ---------- */
   function checkCode(val) {
     const v = String(val || '').trim();
@@ -530,7 +592,7 @@
         <a class="brand" href="index.html"><img src="assets/logo-mark.png" alt="Auction Vault logo"><span>Auction Vault</span></a>
         <button class="menu-toggle" aria-label="Menu">☰</button>
         <nav class="tabs" aria-label="Main">${tabs.map(t => `<a href="${t[1]}" class="${t[0] === page ? 'active' : ''}">${t[2]}</a>`).join('')}</nav>
-        <div class="header-tools">${codeFormHTML}</div>
+        <div class="header-tools">${page === 'seller' ? '' : '<a class="acct-chip hidden" id="acct-chip" href="account.html"></a>'}${codeFormHTML}</div>
       </div>`;
       header.querySelector('.menu-toggle').addEventListener('click', () => header.querySelector('.tabs').classList.toggle('open'));
       bindCodeForm(header.querySelector('.code-form'));
@@ -554,13 +616,14 @@
   window.addEventListener('storage', () => { if (window.AV && AV.onDataChange) AV.onDataChange(); });
   // The old storage-vault cart is gone (vaults now go through offers); tidy up its leftover data.
   try { localStorage.removeItem('av_cart_v1'); localStorage.removeItem('av_orders_v1'); } catch (e) {}
-  document.addEventListener('DOMContentLoaded', renderChrome);
+  document.addEventListener('DOMContentLoaded', () => { renderChrome(); if (document.body.dataset.page !== 'seller') initAccount(); });
 
   window.AV = Object.assign(window.AV || {}, {
     KEYS, CATEGORIES, OWNER_PHONE, HOUR, getItems, getItem, myBid, setMyBid,
     salePrice, minNextBid, money, esc, timeLeft, thumbHTML,
     openModal, closeModal, toast, checkCode, read, write,
     validateEntry, entryError, watchEntries, ENTRY_RULES,
+    AVATAR_EMOJIS, AVATAR_COLORS, avatarHTML, account: acct, onAccount, accountURL, refreshAccount, setProfile,
     startPickup, getPickups, savePickups, updatePickup, sendPickupEmail, pickupPayload, typeLabel, CASH_LINE, MEETUP_POINTS, MEETUP_TIMES, PICKUP_ENDPOINT
   });
 })();

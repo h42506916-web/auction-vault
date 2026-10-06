@@ -78,7 +78,7 @@
   }
   function topHTML(it) {
     const t = state.top[it.id];
-    if (t) return `<div class="top-offer" title="Highest offer so far">🏆 Top offer: <strong>${AV.money(t.amount)}</strong> by <strong>${AV.esc(t.by)}</strong></div>`;
+    if (t) return `<div class="top-offer" title="Highest offer so far">🏆 Top offer: <strong>${AV.money(t.amount)}</strong> by ${AV.avatarHTML(t, 'sm')}<strong>${AV.esc(t.by)}</strong></div>`;
     if (!it.bidCount) return '<div class="top-offer none">No offers yet</div>';
     return state.topLoaded ? '' : '<div class="top-offer none">Top offer: loading…</div>';
   }
@@ -173,6 +173,7 @@
   // The item is marked sold in the database (buy_now RPC) when the buyer confirms the last step.
   function buyNow(id) {
     const it = AV.getItem(id); if (!it || it.sold) return;
+    if (needsLogin()) return openDetail(id); // shows the sign-in prompt
     const price = AV.salePrice(it);
     const body = AV.openModal(`<div class="bin-confirm">
         <div class="pu-item"><span class="pu-emoji" aria-hidden="true">${AV.esc(it.emoji || '📦')}</span>
@@ -205,7 +206,26 @@
   }
 
   function historyHTML(bids) {
-    return `<strong>Offer history</strong>${bids.length ? bids.map(b => `<div>${AV.money(b.amount)} — ${AV.esc(b.by)} · ${new Date(b.at).toLocaleString()}</div>`).join('') : '<div>No offers yet. Be the first!</div>'}`;
+    return `<strong>Offer history</strong>${bids.length ? bids.map(b => `<div class="bid-row">${AV.avatarHTML(b, 'sm')}<span class="bid-who"><strong>${AV.esc(b.by)}</strong>${b.username ? ` <span class="muted">@${AV.esc(b.username)}</span>` : ''}</span><span class="bid-val">${AV.money(b.amount)}</span><span class="bid-when muted">${AV.esc(new Date(b.at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}</span></div>`).join('') : '<div>No offers yet. Be the first!</div>'}`;
+  }
+
+  /* Buyer accounts (supabase/migration_005.sql): once switched on, offers need a signed-in buyer
+     with a profile, whose avatar + display name show on the offer. Before that, the old name box is used. */
+  const acct = () => AV.account;
+  const needsLogin = () => acct().ready && !(acct().session && acct().profile);
+  function loginBoxHTML(what) {
+    const a = acct();
+    const finish = a.session && !a.profile;
+    return `<div class="login-box">
+      <div class="login-ico" aria-hidden="true">🔒</div>
+      <div><strong>${finish ? 'Finish your profile' : 'Sign in'} to ${what}</strong>
+        <p class="muted">Your avatar and display name show next to your offers.</p>
+        <div class="login-actions">${finish ? '<a class="btn" href="account.html">Finish profile</a>'
+          : `<a class="btn" href="${AV.esc(AV.accountURL())}">Sign in</a><a class="btn outline" href="${AV.esc(AV.accountURL('signup'))}">Create account</a>`}</div></div></div>`;
+  }
+  function offeringAsHTML() {
+    const p = acct().profile;
+    return `<div class="offering-as">${AV.avatarHTML(p)}<span>Offering as <strong>${AV.esc(p.display_name)}</strong></span><a href="account.html" class="muted">Edit</a></div>`;
   }
 
   function openDetail(id, focusBid) {
@@ -224,14 +244,18 @@
           <div class="bid-amt" style="font-size:1.8rem">${AV.money(n ? it.currentBid : it.startBid)}</div>
           ${topHTML(it).replace('class="top-offer', 'id="top-offer" class="top-offer')}
           <div class="timer ${tl.ending && !closed ? 'ending' : ''}" data-ends="${it.endsAt}" ${it.sold ? 'data-sold="1"' : ''}>${timerText(it, tl, ' left')}</div>
-          ${closed ? `<p class="msg err">${it.sold ? 'This item has been sold.' : 'This auction has ended.'}</p>` : `
+          ${closed ? `<p class="msg err">${it.sold ? 'This item has been sold.' : 'This auction has ended.'}</p>` : needsLogin() ? `
+          <div class="muted" style="font-size:.85rem;margin:6px 0">Offer ${AV.money(min)} or more.</div>
+          ${loginBoxHTML('make an offer')}
+          <hr style="border:0;border-top:1px solid var(--grey-light);margin:14px 0">
+          ${priceBlock(it)}` : `
           <form class="bid-form" id="bid-form">
             <input type="number" id="bid-amt" min="${min}" step="0.01" value="${min}" aria-label="Your offer">
             <button class="btn" type="submit">Make offer</button>
           </form>
-          <input id="bid-name" maxlength="60" placeholder="Your name (shown in offer history)" aria-label="Your name" value="${AV.esc(buyer.name || '')}" style="width:100%;margin-top:8px;padding:10px;border:1px solid #cfd2d6;border-radius:8px;font:inherit">
+          ${acct().ready ? offeringAsHTML() : `<input id="bid-name" maxlength="60" placeholder="Your name (shown in offer history)" aria-label="Your name" value="${AV.esc(buyer.name || '')}" style="width:100%;margin-top:8px;padding:10px;border:1px solid #cfd2d6;border-radius:8px;font:inherit">
           <span class="field-err" id="bid-name-err" aria-live="polite"></span>
-          <div class="muted" id="bid-name-hint" style="font-size:.8rem">Enter your name to make an offer.</div>
+          <div class="muted" id="bid-name-hint" style="font-size:.8rem">Enter your name to make an offer.</div>`}
           <div class="muted" style="font-size:.8rem">Offer ${AV.money(min)} or more.</div>
           <p class="offer-note">💵 Highest offer wins. Pay cash at the meet-up — no cards.</p>
           <div class="msg" id="bid-msg" role="alert"></div>
@@ -255,18 +279,18 @@
       if (focusBid) body.querySelector('#bid-amt').focus();
       // Your name is checked as you type (no joke or rude names); "Make offer" stays disabled until it passes.
       const nameInput = body.querySelector('#bid-name'), hint = body.querySelector('#bid-name-hint');
-      const watch = AV.watchEntries([{ input: nameInput, field: 'name', note: body.querySelector('#bid-name-err') }], form.querySelector('button'),
-        () => { hint.hidden = nameInput.value.trim() !== ''; });
+      const watch = nameInput ? AV.watchEntries([{ input: nameInput, field: 'name', note: body.querySelector('#bid-name-err') }], form.querySelector('button'),
+        () => { hint.hidden = nameInput.value.trim() !== ''; }) : { valid: () => true, reject() {} };
       form.addEventListener('submit', async e => {
         e.preventDefault();
         const amt = Math.round(parseFloat(body.querySelector('#bid-amt').value) * 100) / 100;
-        const name = body.querySelector('#bid-name').value.trim();
+        const name = nameInput ? nameInput.value.trim() : (acct().profile && acct().profile.display_name) || '';
         const msg = body.querySelector('#bid-msg'); const btn = form.querySelector('button');
         const err = t => { msg.className = 'msg err'; msg.textContent = t; };
         const cur = AV.getItem(id); const need = AV.minNextBid(cur);
         if (!(amt >= need)) return err(`Your offer must be at least ${AV.money(need)}.`);
         if (!watch.valid()) { nameInput.focus(); return; }
-        if (name.length < 2) { body.querySelector('#bid-name').focus(); return err('Please enter your name so the seller knows who made the offer.'); }
+        if (name.length < 2) { if (nameInput) nameInput.focus(); return err('Please enter your name so the seller knows who made the offer.'); }
         if (cur.endsAt < Date.now() || cur.sold) return err('Sorry, this listing has closed.');
         btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Sending your offer…';
         let r;
@@ -274,7 +298,10 @@
         catch (ex) { btn.disabled = false; return err(AV.db.friendly(ex)); }
         btn.disabled = false;
         const bad = AV.entryError(r);
-        if (bad) { msg.className = 'msg'; msg.textContent = ''; watch.reject('name', name); nameInput.focus(); return; }
+        if (bad && nameInput) { msg.className = 'msg'; msg.textContent = ''; watch.reject('name', name); nameInput.focus(); return; }
+        if (r && (r.error === 'login_required' || r.error === 'profile_required')) {
+          msg.className = 'msg'; msg.innerHTML = loginBoxHTML('make an offer'); return;
+        }
         if (!r || !r.ok) {
           err(offerWords((r && r.message) || 'Your offer was not accepted.'));
           AV.db.loadItem(id).then(render).catch(() => {});
@@ -282,8 +309,10 @@
         }
         Object.assign(cur, { currentBid: Number(r.current_bid), bidCount: Number(r.bid_count) });
         AV.setMyBid(id, Number(r.current_bid));
-        state.top[id] = { amount: Number(r.current_bid), by: name, at: Date.now() };
-        const saved = AV.read(AV.KEYS.buyer, {}) || {}; AV.write(AV.KEYS.buyer, Object.assign(saved, { name }));
+        const p = acct().profile;
+        state.top[id] = { amount: Number(r.current_bid), by: r.bidder_name || name, at: Date.now(), username: r.username || (p && p.username) || '',
+          emoji: r.avatar_emoji || (p && p.avatar_emoji) || '', color: r.avatar_color || (p && p.avatar_color) || '' };
+        if (nameInput) { const saved = AV.read(AV.KEYS.buyer, {}) || {}; AV.write(AV.KEYS.buyer, Object.assign(saved, { name })); }
         render();
         // Offer accepted → cash-only meet-up flow.
         arrangeBidPickup(cur, Number(r.current_bid), `✅ Your ${AV.money(r.current_bid)} offer is in — it's the highest offer right now!`);
@@ -295,6 +324,14 @@
   }
 
   AV.onModalClose = () => { openId = null; setItemParam(null); };
+  // Account state arrives after the first paint: refresh an open item so the offer box matches.
+  let lastAcct = '';
+  AV.onAccount(a => {
+    const key = [a.ready, a.session && a.session.user.id, a.profile && a.profile.display_name].join('|');
+    if (key === lastAcct) return; const first = !lastAcct; lastAcct = key;
+    if (!first && openId && !document.querySelector('#av-modal input:focus')) openDetail(openId);
+    else if (first && openId && a.ready) openDetail(openId);
+  });
   AV.onDataChange = render;
   document.addEventListener('DOMContentLoaded', init);
 })();
