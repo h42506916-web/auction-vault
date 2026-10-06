@@ -94,9 +94,34 @@
     openDetail(id, act && act.dataset.act === 'bid');
   }
 
+  // Buy It Now: confirm the offer, then hand over to the cash-only pickup flow (no cart / card payment).
   function buyNow(id) {
     const it = AV.getItem(id); if (!it || it.sold) return;
-    AV.addToCart({ itemId: it.id, name: it.name, price: AV.salePrice(it), emoji: it.emoji, kind: 'Auction item — Buy It Now' + (it.discount > 0 ? ` (${it.discount}% off)` : '') });
+    const price = AV.salePrice(it);
+    const body = AV.openModal(`<div class="bin-confirm">
+        <div class="pu-item"><span class="pu-emoji" aria-hidden="true">${AV.esc(it.emoji || '📦')}</span>
+          <div><div class="cat">${AV.esc(it.category)}</div><strong>${AV.esc(it.name)}</strong></div>
+          <div class="pu-price">${AV.money(price)}</div></div>
+        <h2>Buy It Now?</h2>
+        <p>You're offering to buy <strong>${AV.esc(it.name)}</strong> for <strong>${AV.money(price)}</strong>${it.discount > 0 ? ` <span class="muted">(${Math.round(it.discount)}% off ${AV.money(it.buyNow)})</span>` : ''}.
+        Payment is <strong>cash only</strong>, at a school meet-up you'll choose next.</p>
+        <div class="pu-nav"><button class="btn outline" type="button" data-cancel>Cancel</button><button class="btn" type="button" data-confirm>Confirm offer</button></div>
+      </div>`);
+    body.querySelector('[data-cancel]').addEventListener('click', AV.closeModal);
+    body.querySelector('[data-confirm]').addEventListener('click', () => {
+      const fresh = AV.getItem(id);
+      if (!fresh || fresh.sold || fresh.endsAt < Date.now()) { AV.toast('Sorry, this listing has closed.'); AV.closeModal(); render(); return; }
+      AV.startPickup({ itemId: fresh.id, item: fresh.name, emoji: fresh.emoji, price: AV.salePrice(fresh), type: 'Buy It Now' });
+    });
+  }
+
+  function arrangeBidPickup(it, amt, banner) {
+    AV.startPickup({ itemId: it.id, item: it.name, emoji: it.emoji, price: amt, type: 'Highest bid', banner });
+  }
+  function needsBidPickup(it) {
+    const last = (it.bids || []).slice(-1)[0];
+    if (!last || last.by !== 'You' || it.sold) return false;
+    return !AV.getPickups().some(p => p.itemId === it.id && p.type === 'Highest bid' && p.price === last.amount);
   }
 
   function openDetail(id, focusBid) {
@@ -122,6 +147,7 @@
           <hr style="border:0;border-top:1px solid var(--grey-light);margin:14px 0">
           ${priceBlock(it)}
           <button class="btn outline" id="bin" style="margin-top:8px;width:100%">Buy It Now for ${AV.money(AV.salePrice(it))}</button>`}
+          ${!closed && needsBidPickup(it) ? `<button class="btn grey" id="arrange" style="margin-top:8px;width:100%">Arrange cash pickup for your ${AV.money(it.currentBid)} bid</button>` : ''}
           <div class="history"><strong>Bid history</strong>${n ? it.bids.slice().reverse().map(b => `<div>${AV.money(b.amount)} — ${AV.esc(b.by)} · ${new Date(b.at).toLocaleString()}</div>`).join('') : '<div>No bids yet. Be the first!</div>'}</div>
         </div></div>`);
     openId = id;
@@ -138,10 +164,13 @@
         if (!(amt >= need)) { msg.className = 'msg err'; msg.textContent = `Your bid must be at least ${AV.money(need)}.`; return; }
         if (fresh.endsAt < Date.now() || fresh.sold) { msg.className = 'msg err'; msg.textContent = 'Sorry, this listing has closed.'; return; }
         AV.updateItem(id, x => { x.currentBid = amt; x.bids = x.bids || []; x.bids.push({ amount: amt, by: 'You', at: Date.now() }); });
-        render(); openDetail(id);
-        const m2 = document.querySelector('#bid-msg'); if (m2) { m2.className = 'msg ok'; m2.textContent = `✅ Bid of ${AV.money(amt)} placed — you're the highest bidder!`; }
+        render();
+        // Bid accepted = offer confirmed → cash-only pickup flow.
+        arrangeBidPickup(AV.getItem(id), amt, `✅ Bid of ${AV.money(amt)} placed — you're the highest bidder!`);
       });
       body.querySelector('#bin').addEventListener('click', () => buyNow(id));
+      const arr = body.querySelector('#arrange');
+      if (arr) arr.addEventListener('click', () => { const f = AV.getItem(id); arrangeBidPickup(f, f.currentBid); });
     }
   }
 

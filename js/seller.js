@@ -10,7 +10,35 @@
     $('#gate').classList.toggle('hidden', ok);
     $('#dash').classList.toggle('hidden', !ok);
     $('#banner').classList.toggle('hidden', !ok);
-    if (ok) renderRows();
+    if (ok) { renderRows(); renderPickups(); }
+  }
+
+  const EMAIL_LABEL = { sent: ['✓ Sent', 'ok'], failed: ['✕ Failed', 'fail'], sending: ['… Sending', ''] };
+  function renderPickups() {
+    const list = AV.getPickups().slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+    $('#pu-n').textContent = list.length;
+    $('#pu-rows').innerHTML = list.map(p => {
+      const em = EMAIL_LABEL[p.emailStatus] || ['—', ''];
+      return `<tr data-id="${AV.esc(p.id)}" class="${p.collected ? 'collected' : ''}">
+        <td style="white-space:nowrap">${AV.esc(new Date(p.at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }))}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.id)}</span></td>
+        <td><span class="em-inline">${AV.esc(p.emoji || '📦')}</span> <strong>${AV.esc(p.item)}</strong><br><span class="tag">${AV.esc(p.type)}</span></td>
+        <td><strong>${AV.money(p.price)}</strong><br><span class="muted" style="font-size:.75rem">💵 Cash</span></td>
+        <td><strong>${AV.esc(p.name)}</strong>${p.cls ? `<br><span class="muted">${AV.esc(p.cls)}</span>` : ''}${p.contact ? `<br><span class="muted">${AV.esc(p.contact)}</span>` : ''}</td>
+        <td><strong>${AV.esc(p.meetup)}</strong><br>${AV.esc(p.time)}</td>
+        <td><span class="pu-status ${em[1]}" title="${AV.esc(p.emailError || '')}">${em[0]}</span></td>
+        <td style="white-space:nowrap"><button class="btn small ${p.collected ? 'grey' : 'outline'}" data-pu="collected">${p.collected ? '✓ Collected' : 'Mark collected'}</button> <button class="btn small danger" data-pu="del">Remove</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">No pickups yet. They appear here when a buyer confirms a Buy It Now or bid and picks a meet-up.</td></tr>';
+  }
+  function onPickupClick(e) {
+    const b = e.target.closest('[data-pu]'); if (!b) return;
+    const id = b.closest('tr').dataset.id;
+    if (b.dataset.pu === 'collected') { AV.updatePickup(id, p => { p.collected = !p.collected; }); }
+    else if (b.dataset.pu === 'del') {
+      if (!confirm('Remove this pickup from the list?')) return;
+      AV.savePickups(AV.getPickups().filter(p => p.id !== id)); AV.toast('Pickup removed');
+    }
+    renderPickups();
   }
 
   function renderRows() {
@@ -106,7 +134,8 @@
       const mine = AV.getItems().filter(i => i.source === 'seller');
       AV.resetItems(); AV.saveItems(mine.concat(AV.getItems())); renderRows(); AV.toast('Example items restored');
     });
-    AV.onDataChange = renderRows;
+    $('#pu-rows').addEventListener('click', onPickupClick);
+    AV.onDataChange = () => { if (unlocked()) { renderRows(); renderPickups(); } };
     show();
   });
 })();

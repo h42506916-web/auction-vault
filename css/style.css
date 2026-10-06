@@ -175,6 +175,53 @@ table.items input.disc{width:60px;padding:5px;border:1px solid #cfd2d6;border-ra
 .seller-banner a{color:#fff}
 .table-wrap{overflow-x:auto}
 
+/* Auction pickup flow (cash-only meet-up) */
+.pickup,.bin-confirm{max-width:560px;margin:0 auto}
+.pu-banner{margin:0 0 12px;padding:8px 12px;background:#e8f5ee;border-radius:8px}
+.pu-item{display:flex;align-items:center;gap:12px;background:var(--grey-bg);border:1px solid var(--grey-light);border-radius:12px;padding:10px 14px;margin:6px 34px 14px 0}
+.pu-item strong{color:var(--text);line-height:1.25}
+.pu-emoji{font-size:2rem;width:48px;height:48px;display:grid;place-items:center;background:#fff;border-radius:10px;border:1px solid var(--grey-light);flex:none}
+.pu-price{margin-left:auto;font-family:var(--head);font-weight:800;color:var(--navy);font-size:1.25rem;white-space:nowrap}
+.pu-steps{list-style:none;display:flex;padding:0;margin:0 0 4px;gap:4px}
+.pu-steps li{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;font-size:.66rem;color:var(--grey);text-align:center}
+.pu-steps li::before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:3px;background:var(--grey-light);z-index:0}
+.pu-steps li:first-child::before{display:none}
+.pu-steps li span{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px solid var(--grey-light);font-family:var(--head);font-weight:800;color:var(--grey);font-size:.8rem}
+.pu-steps li em{font-style:normal;font-family:var(--head);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pu-steps li.done span{background:var(--grey);border-color:var(--grey);color:#fff}
+.pu-steps li.done::before,.pu-steps li.current::before{background:var(--navy)}
+.pu-steps li.current span{background:var(--navy);border-color:var(--navy);color:#fff}
+.pu-steps li.current em{color:var(--navy)}
+.pu-stepno{font-size:.72rem;color:var(--grey);text-align:right;font-family:var(--head);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.pickup h2,.bin-confirm h2{font-size:1.25rem;margin-top:.4em}
+.cash-box{display:flex;gap:14px;align-items:flex-start;border:2px solid var(--navy);border-left-width:8px;border-radius:12px;padding:16px 18px;background:#f3f6fb}
+.cash-box strong{color:var(--navy);font-size:1.05rem}
+.cash-box p{margin:.4em 0 0}
+.cash-ico{font-size:2.4rem;line-height:1}
+.pu-note{font-size:.8rem}
+.pu-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:14px 0 4px}
+.pu-option{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 12px;border:2px solid var(--grey-light);border-radius:12px;background:#fff;cursor:pointer;font-family:var(--head);font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;font-size:.82rem;transition:.15s}
+.pu-option:hover{border-color:var(--grey);background:var(--grey-bg)}
+.pu-option.selected{border-color:var(--navy);background:var(--navy);color:#fff;box-shadow:0 6px 18px rgba(11,42,91,.25)}
+.pu-ico{font-size:2rem}
+.pu-nav{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.pu-nav .btn{min-width:120px}
+.pu-summary{width:100%;border-collapse:collapse;font-size:.92rem;margin:8px 0}
+.pu-summary th{text-align:left;width:38%;font-family:var(--head);text-transform:uppercase;letter-spacing:.06em;font-size:.72rem;color:var(--grey);padding:10px 8px;border-bottom:1px solid var(--grey-light);vertical-align:top}
+.pu-summary td{padding:10px 8px;border-bottom:1px solid var(--grey-light)}
+.pu-recap{font-size:1.05rem}
+.pu-result.err .tick{color:var(--danger)}
+.pu-sending{padding:40px 10px}
+.spinner{width:42px;height:42px;margin:0 auto 12px;border:4px solid var(--grey-light);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pickups-panel{margin-top:26px}
+table.pickups td{vertical-align:top}
+table.pickups tr.collected td{opacity:.55}
+.em-inline{font-size:1.2rem}
+.pu-status{font-weight:700;font-size:.78rem;white-space:nowrap}
+.pu-status.ok{color:var(--success)} .pu-status.fail{color:var(--danger)}
+@media (max-width:520px){.pu-steps li em{display:none}.pu-item{margin-right:30px}}
+
 /* Footer */
 .site-footer{background:var(--navy-dark);color:#cdd3de;padding:30px 0 20px;margin-top:40px;font-size:.85rem}
 .footer-inner{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
