@@ -613,6 +613,7 @@
       footer.className = 'site-footer';
       footer.innerHTML = `<div class="container footer-inner">
         <div><div class="brand">Auction Vault</div><div>Mystery vaults &amp; online auctions.</div></div>
+        <div>Need help? <a href="support.html">Customer Service</a></div>
         <div>${codeFormHTML}</div>
       </div><div class="container" style="margin-top:16px;font-size:.75rem;color:#8A8D91">© ${new Date().getFullYear()} Auction Vault. Cash only at the meet-up. No card payments — make an offer, highest offer wins.</div>`;
       bindCodeForm(footer.querySelector('.code-form'));
