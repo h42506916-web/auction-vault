@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><script src="js/common.js"></script>
+<title>Auction — Auction Vault</title></head>
+<body data-page="auction">
+<header id="site-header"></header>
+<main class="container">
+  <div class="page-head">
+    <h1>The Auction</h1>
+    <p>Bid on finds from our vaults, or skip the wait with Buy It Now. Bids are saved in this browser.</p>
+  </div>
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="Search items…" aria-label="Search items">
+    <select id="cat" aria-label="Category"><option value="">All categories</option></select>
+    <select id="sort" aria-label="Sort">
+      <option value="ending">Ending soonest</option>
+      <option value="newest">Newly listed</option>
+      <option value="low">Price: low to high</option>
+      <option value="high">Price: high to low</option>
+      <option value="deals">Biggest discount</option>
+    </select>
+    <label style="font-size:.85rem;display:flex;gap:6px;align-items:center"><input type="checkbox" id="dealsOnly"> Deals only</label>
+  </div>
+  <div class="chips" id="chips"></div>
+  <p class="muted" id="count" style="font-size:.85rem"></p>
+  <div class="grid" id="grid"></div>
+</main>
+<footer id="site-footer"></footer>
+<script src="js/auction.js"></script>
+</body></html>

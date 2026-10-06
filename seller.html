@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><script src="js/common.js"></script>
+<meta name="robots" content="noindex,nofollow">
+<title>Seller Dashboard — Auction Vault</title></head>
+<body data-page="seller">
+<header id="site-header"></header>
+<div class="seller-banner hidden" id="banner"><div class="container"><span>🔑 Seller Dashboard</span><span><a href="auction.html">View auction page →</a> &nbsp; <a href="#" id="lock">Lock dashboard</a></span></div></div>
+<main class="container">
+  <div class="gate panel hidden" id="gate">
+    <h2>Seller Access</h2>
+    <p class="muted">Enter the seller code to continue.</p>
+    <form class="stack" id="gate-form" autocomplete="off"><input id="gate-in" placeholder="Code" aria-label="Seller code"><button class="btn" type="submit">Unlock</button><div class="msg err" id="gate-msg"></div></form>
+  </div>
+  <div id="dash" class="hidden">
+    <div class="page-head"><h1>Seller Dashboard</h1><p>List items for sale, edit or delete them, and set a discount on any item. Changes show up on the Auction page straight away (in this browser).</p></div>
+    <div class="seller-grid">
+      <div class="panel">
+        <h3 id="form-title">List a New Item</h3>
+        <form class="stack" id="item-form">
+          <input type="hidden" name="id">
+          <label>Item name<input name="name" required maxlength="80"></label>
+          <label>Description<textarea name="description" rows="3" maxlength="600"></textarea></label>
+          <div class="row2">
+            <label>Category<select name="category" id="f-cat"></select></label>
+            <label>Icon (emoji)<input name="emoji" maxlength="4" placeholder="📦"></label>
+          </div>
+          <label>Image URL (optional)<input name="image" type="url" placeholder="https://…"></label>
+          <div class="row2">
+            <label>Starting bid ($)<input name="startBid" type="number" min="0" step="0.01" required></label>
+            <label>Buy It Now price ($)<input name="buyNow" type="number" min="0.01" step="0.01" required></label>
+          </div>
+          <div class="row2">
+            <label>Auction length (days)<input name="days" type="number" min="0.1" step="0.1" value="7"></label>
+            <label>Discount %<input name="discount" type="number" min="0" max="95" step="1" value="0"></label>
+          </div>
+          <div class="msg" id="form-msg"></div>
+          <div style="display:flex;gap:8px"><button class="btn" type="submit" id="submit-btn" style="flex:1">List Item</button><button class="btn outline hidden" type="button" id="cancel-edit">Cancel</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <h3 style="margin:0">Current Items (<span id="n">0</span>)</h3>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><select id="filter" style="padding:6px;border-radius:6px;border:1px solid #cfd2d6"><option value="">All items</option><option value="mine">My listings</option><option value="seed">Example items</option></select>
+          <button class="btn small grey" id="reset">Reset examples</button></div>
+        </div>
+        <div class="table-wrap"><table class="items"><thead><tr><th></th><th>Item</th><th>Bid / BIN</th><th>Discount %</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script src="js/seller.js"></script>
+</body></html>
