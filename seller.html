@@ -1,18 +1,34 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><script src="js/common.js"></script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js"></script><script src="js/db.js"></script><script src="js/common.js"></script>
 <meta name="robots" content="noindex,nofollow">
 <title>Seller Dashboard — Auction Vault</title></head>
 <body data-page="seller">
 <header id="site-header"></header>
-<div class="seller-banner hidden" id="banner"><div class="container"><span>🔑 Seller Dashboard</span><span><a href="auction.html">View auction page →</a> &nbsp; <a href="#" id="lock">Lock dashboard</a></span></div></div>
+<div class="seller-banner hidden" id="banner"><div class="container"><span>🔑 Seller Dashboard · <span id="who"></span></span><span><a href="auction.html">View auction page →</a> &nbsp; <a href="#" id="signout">Sign out</a></span></div></div>
 <main class="container">
+  <div class="gate panel" id="checking"><div class="spinner" aria-hidden="true"></div><p class="muted">Checking sign-in…</p></div>
   <div class="gate panel hidden" id="gate">
-    <h2>Seller Access</h2>
-    <p class="muted">Enter the seller code to continue.</p>
-    <form class="stack" id="gate-form" autocomplete="off"><input id="gate-in" placeholder="Code" aria-label="Seller code"><button class="btn" type="submit">Unlock</button><div class="msg err" id="gate-msg"></div></form>
+    <h2>Seller Sign-in</h2>
+    <p class="muted">The dashboard is for the owner only. We'll email a one-time sign-in link (and code) to the owner's address.</p>
+    <form class="stack" id="login-form" autocomplete="on">
+      <label>Owner email<input id="login-email" type="email" required autocomplete="email"></label>
+      <button class="btn" type="submit" id="send-link">Send login link</button>
+    </form>
+    <div id="otp-box" class="hidden" style="margin-top:14px">
+      <p class="msg ok" id="sent-msg"></p>
+      <p class="muted" style="font-size:.85rem">Open the link on this device, or type the code from the email here:</p>
+      <form class="stack" id="otp-form" autocomplete="off"><input id="otp-code" inputmode="numeric" maxlength="10" placeholder="Code from email" aria-label="Code from email"><button class="btn outline" type="submit">Sign in with code</button></form>
+    </div>
+    <div class="msg err" id="gate-msg" role="alert"></div>
+  </div>
+  <div class="gate panel hidden" id="denied">
+    <h2>Not authorised</h2>
+    <p>You're signed in as <strong id="denied-email"></strong>, which is not the owner account. Only the owner can use the seller dashboard.</p>
+    <button class="btn" type="button" id="signout2">Sign out</button>
   </div>
   <div id="dash" class="hidden">
-    <div class="page-head"><h1>Seller Dashboard</h1><p>List items for sale, edit or delete them, and set a discount on any item, and see buyer pickups below. Changes show up on the Auction page straight away (in this browser).</p></div>
+    <div class="page-head"><h1>Seller Dashboard</h1><p>List items for sale, edit or remove them, set discounts, mark items sold, change vault prices and see buyer pickups. Changes are saved online and show up for every visitor straight away.</p></div>
+    <div class="msg err" id="dash-msg" role="alert"></div>
     <div class="seller-grid">
       <div class="panel">
         <h3 id="form-title">List a New Item</h3>
@@ -40,18 +56,22 @@
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <h3 style="margin:0">Current Items (<span id="n">0</span>)</h3>
-          <div style="display:flex;gap:6px;flex-wrap:wrap"><select id="filter" style="padding:6px;border-radius:6px;border:1px solid #cfd2d6"><option value="">All items</option><option value="mine">My listings</option><option value="seed">Example items</option></select>
-          <button class="btn small grey" id="reset">Reset examples</button></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap"><select id="filter" style="padding:6px;border-radius:6px;border:1px solid #cfd2d6"><option value="">All items</option><option value="mine">My listings</option><option value="seed">Example items</option><option value="sold">Sold</option><option value="removed">Removed</option></select>
+          <button class="btn small grey" id="refresh">Refresh</button></div>
         </div>
         <div class="table-wrap"><table class="items"><thead><tr><th></th><th>Item</th><th>Bid / BIN</th><th>Discount %</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
       </div>
+    </div>
+    <div class="panel pickups-panel" id="tiers-panel">
+      <h3 style="margin:0">Storage Vault Prices</h3>
+      <div class="table-wrap"><table class="items"><thead><tr><th></th><th>Vault</th><th>Price ($)</th><th>Shown</th><th></th></tr></thead><tbody id="tier-rows"></tbody></table></div>
     </div>
     <div class="panel pickups-panel" id="pickups">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <h3 style="margin:0">Pickups (<span id="pu-n">0</span>)</h3>
         <span class="muted" style="font-size:.8rem">💵 Cash only, paid at the meet-up. Each pickup is also emailed to the owner.</span>
       </div>
-      <div class="table-wrap"><table class="items pickups"><thead><tr><th>Submitted</th><th>Item</th><th>Price</th><th>Buyer</th><th>Meet-up</th><th>Email</th><th></th></tr></thead><tbody id="pu-rows"></tbody></table></div>
+      <div class="table-wrap"><table class="items pickups"><thead><tr><th>Submitted</th><th>Item</th><th>Price</th><th>Buyer</th><th>Meet-up</th><th></th></tr></thead><tbody id="pu-rows"></tbody></table></div>
     </div>
   </div>
 </main>

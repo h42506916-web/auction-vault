@@ -1,69 +1,36 @@
-/* Auction Vault — shared helpers: data store (localStorage), header/footer, cart, secret code */
+/* Auction Vault — shared helpers: header/footer, cart (local), modal, cash pickup flow, secret code.
+   Auction items, bids, pickups and storage tiers live in Supabase (see js/db.js). */
 (function () {
   'use strict';
-  const KEYS = { items: 'av_items_v1', cart: 'av_cart_v1', orders: 'av_orders_v1', seller: 'av_seller_ok', pickups: 'av_pickups_v1', buyer: 'av_buyer_v1' };
-  const SECRET_CODE = 'SCOUT TROOPER!'; // NOTE: client-side only — not real security.
+  const KEYS = { cart: 'av_cart_v1', orders: 'av_orders_v1', pickups: 'av_pickups_v1', buyer: 'av_buyer_v1', myBids: 'av_my_bids_v1' };
+  const SECRET_CODE = 'SCOUT TROOPER!'; // Only a shortcut to seller.html — the dashboard itself needs an email sign-in.
   const OWNER_PHONE = '455982359';
   const HOUR = 3600 * 1000;
 
   const CATEGORIES = ['Electronics', 'Collectibles', 'Tools', 'Fashion', 'Home & Garden', 'Sports', 'Toys & Games', 'Music', 'Other'];
-
-  function seedItems() {
-    const now = Date.now();
-    const s = (id, name, category, emoji, startBid, currentBid, buyNow, hours, desc, bids) => ({
-      id, name, category, emoji, image: '', description: desc,
-      startBid, currentBid, buyNow, endsAt: now + hours * HOUR,
-      discount: 0, bids: bids || [], source: 'seed', sold: false, createdAt: now
-    });
-    return [
-      s('seed-1', 'Vintage Film Camera (35mm)', 'Electronics', '📷', 20, 45, 120, 5.5, 'Classic 35mm rangefinder pulled from a recently opened vault. Shutter fires, light seals look tidy.', [{ amount: 45, by: 'lensfan', at: now - 2 * HOUR }]),
-      s('seed-2', 'Retro Game Console Bundle', 'Toys & Games', '🎮', 50, 88, 199, 26, 'Console with two controllers and a box of cartridges. Untested beyond power-on.', [{ amount: 88, by: 'pixelpete', at: now - HOUR }]),
-      s('seed-3', 'Cordless Drill & Bit Set', 'Tools', '🛠️', 15, 32, 75, 49, '18V cordless drill, one battery, charger and a 40-piece bit set in a case.'),
-      s('seed-4', 'Acoustic Guitar', 'Music', '🎸', 40, 65, 180, 3.2, 'Dreadnought acoustic, a few dings on the body, plays nicely. Soft case included.'),
-      s('seed-5', 'Antique Pocket Watch', 'Collectibles', '⌚', 60, 140, 350, 70, 'Brass-cased pocket watch with chain. Ticks when wound. Age unknown — sold as found.'),
-      s('seed-6', 'Designer-Style Leather Jacket', 'Fashion', '🧥', 25, 25, 90, 12, 'Brown leather jacket, size M-ish. Light wear on the cuffs.'),
-      s('seed-7', 'Mountain Bike', 'Sports', '🚲', 80, 115, 260, 30, '21-speed mountain bike. Tyres need air, brakes work.'),
-      s('seed-8', 'Box of Comic Books (40+)', 'Collectibles', '📚', 10, 38, 110, 8, 'Mixed lot of 40+ comics in bags and boards. Titles vary — a true mystery box.'),
-      s('seed-9', 'Espresso Machine', 'Home & Garden', '☕', 30, 52, 140, 54, 'Home espresso machine with portafilter and milk frother. Powers on.'),
-      s('seed-10', 'Vinyl Record Collection', 'Music', '💿', 20, 61, 150, 18, 'About 60 LPs, mostly 70s and 80s rock and soul. Sleeves show shelf wear.'),
-      s('seed-11', 'Camping Gear Lot', 'Sports', '⛺', 15, 22, 70, 95, '2-person tent, two sleeping bags, a lantern and a camp stove.'),
-      s('seed-12', 'Mystery Locked Safe', 'Other', '🔒', 50, 175, 400, 1.5, 'A small locked safe found at the back of a vault. Contents unknown. No key. Good luck!', [{ amount: 175, by: 'vaulthunter', at: now - 0.5 * HOUR }])
-    ];
-  }
 
   function read(key, fallback) {
     try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
   }
   function write(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn('localStorage unavailable', e); } }
 
-  function getItems() {
-    let items = read(KEYS.items, null);
-    if (!Array.isArray(items)) { items = seedItems(); write(KEYS.items, items); }
-    // Keep demo auctions alive: relist seeded items that have ended without selling.
-    let changed = false;
-    items.forEach(it => {
-      if (it.source === 'seed' && !it.sold && it.endsAt < Date.now()) { it.endsAt = Date.now() + (24 + Math.random() * 72) * HOUR; changed = true; }
-    });
-    if (changed) write(KEYS.items, items);
-    return items;
-  }
-  function saveItems(items) { write(KEYS.items, items); }
-  function getItem(id) { return getItems().find(i => i.id === id); }
-  function updateItem(id, fn) {
-    const items = getItems(); const it = items.find(i => i.id === id);
-    if (!it) return null; fn(it); saveItems(items); return it;
-  }
-  function resetItems() { write(KEYS.items, seedItems()); }
+  // Items come from Supabase (AV.db); these read the copy loaded on this page.
+  function getItems() { return (window.AV && AV.db) ? AV.db.items : []; }
+  function getItem(id) { return (window.AV && AV.db) ? AV.db.cached(id) : null; }
 
   function salePrice(it) {
     const d = Math.min(95, Math.max(0, Number(it.discount) || 0));
     return Math.round(it.buyNow * (100 - d)) / 100;
   }
+  // Must match public.min_next_bid() in supabase/schema.sql
   function minNextBid(it) {
     const cur = Number(it.currentBid) || 0;
     const step = cur < 50 ? 1 : cur < 200 ? 5 : 10;
-    return (it.bids && it.bids.length) ? cur + step : Math.max(cur, it.startBid);
+    return (Number(it.bidCount) || 0) > 0 ? cur + step : (Number(it.startBid) || 0);
   }
+  // Remember bids made from this browser (to offer "Arrange cash pickup" later)
+  function myBid(id) { return (read(KEYS.myBids, {}) || {})[id]; }
+  function setMyBid(id, amt) { const m = read(KEYS.myBids, {}) || {}; m[id] = amt; write(KEYS.myBids, m); }
 
   const money = n => '$' + Number(n || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -142,9 +109,11 @@
     body.querySelectorAll('[data-pickup]').forEach(b => b.addEventListener('click', () => {
       const c = getCart().find(x => x.key === b.dataset.pickup); if (!c) return openCart();
       saveCart(getCart().filter(x => x.key !== c.key));
-      const it = getItem(c.itemId);
-      if (!it || it.sold) { toast('Sorry, that item is no longer available'); return openCart(); }
-      startPickup({ itemId: it.id, item: it.name, emoji: it.emoji, price: salePrice(it), type: 'Buy It Now' });
+      b.disabled = true;
+      AV.db.loadItem(c.itemId).then(it => {
+        if (!it || it.sold || it.endsAt < Date.now()) { toast('Sorry, that item is no longer available'); return openCart(); }
+        startPickup({ itemId: it.id, item: it.name, emoji: it.emoji, price: salePrice(it), type: 'Buy It Now' });
+      }).catch(e => { toast(AV.db.friendly(e)); saveCart(getCart().concat([c])); openCart(); });
     }));
     const go = body.querySelector('#go-checkout');
     if (go) go.addEventListener('click', openCheckout);
@@ -319,47 +288,61 @@
       else next.addEventListener('click', () => { if (!next.disabled) { st.step++; render(); } });
     }
 
-    let pickup = null;
-    function submit() {
-      const err = root.querySelector('#pu-err');
+    // job tracks which parts already succeeded, so "Try again" only redoes the failed ones
+    let pickup = null; const job = { sold: isBid, saved: false, emailed: false };
+    const busy = text => { root.innerHTML = `<div class="success-box pu-sending"><div class="spinner" aria-hidden="true"></div><h3>${esc(text)}</h3></div>`; };
+    function failScreen(title, text, retry) {
+      root.innerHTML = `<div class="success-box pu-result err"><div class="tick">⚠️</div><h2>${esc(title)}</h2>
+        <p>${text}</p>
+        <p class="muted">Still stuck? Call the owner on <a href="tel:${OWNER_PHONE}">${OWNER_PHONE}</a>${pickup ? ' and quote ' + esc(pickup.id) : ''}.</p>
+        <div class="pu-nav"><button class="btn outline" type="button" data-done>Close</button>${retry ? '<button class="btn" type="button" data-retry>Try again</button>' : ''}</div></div>`;
+      root.querySelector('[data-done]').addEventListener('click', closeModal);
+      if (retry) root.querySelector('[data-retry]').addEventListener('click', submit);
+      if (window.AV && AV.onDataChange) AV.onDataChange();
+    }
+    async function submit() {
       if (!pickup) {
-        const it = getItem(offer.itemId);
-        if (!isBid && (!it || it.sold)) { err.textContent = 'Sorry — this item has already been sold.'; return; }
         // One pickup per item for bids from this browser: a higher bid replaces the earlier pickup.
         const prev = isBid ? getPickups().find(p => p.itemId === offer.itemId && p.type === offer.type && !p.collected) : null;
-        pickup = upsertPickup({
+        pickup = {
           id: prev ? prev.id : 'PU-' + Date.now().toString(36).toUpperCase().slice(-5) + Math.random().toString(36).slice(2, 5).toUpperCase(),
           itemId: offer.itemId, item: offer.item, emoji: offer.emoji || '📦', price: offer.price, type: offer.type,
           name: st.name, cls: st.cls, contact: st.contact, payment: 'Cash', meetup: st.meetup, time: st.time,
           at: Date.now(), emailStatus: 'sending', collected: false
-        });
-        if (!isBid) {
-          updateItem(offer.itemId, x => { x.sold = true; });
-          saveCart(getCart().filter(c => c.itemId !== offer.itemId));
-        }
-        if (window.AV && AV.onDataChange) AV.onDataChange();
+        };
       }
       st.done = true;
-      root.innerHTML = `<div class="success-box pu-sending"><div class="spinner" aria-hidden="true"></div><h3>Sending your pickup details to the seller…</h3></div>`;
-      sendPickupEmail(pickup).then(() => {
-        updatePickup(pickup.id, p => { p.emailStatus = 'sent'; p.emailError = ''; });
+      if (!job.sold) { // Buy It Now: claim the item in the shared database first
+        busy('Confirming your purchase…');
+        let r;
+        try { r = await AV.db.buyNow(offer.itemId); } catch (e) { return failScreen("Couldn't confirm your purchase", esc(AV.db.friendly(e)), true); }
+        if (!r || !r.ok) { st.done = false; return failScreen('Sorry — this item is no longer available', esc((r && r.message) || 'It may have just been sold.'), false); }
+        job.sold = true;
+        if (r.price != null) pickup.price = Number(r.price);
+        const cachedItem = AV.db.cached(offer.itemId); if (cachedItem) { cachedItem.sold = true; cachedItem.status = 'sold'; }
+        saveCart(getCart().filter(c => c.itemId !== offer.itemId));
+        if (window.AV && AV.onDataChange) AV.onDataChange();
+      }
+      upsertPickup(pickup);
+      busy('Sending your pickup details to the seller…');
+      const [saved, mailed] = await Promise.allSettled([
+        job.saved ? Promise.resolve() : AV.db.createPickup(pickup).then(r => { if (!r || !r.ok) throw new Error((r && r.message) || 'Could not save pickup'); }),
+        job.emailed ? Promise.resolve() : sendPickupEmail(pickup)
+      ]);
+      if (saved.status === 'fulfilled') job.saved = true; else console.warn('create_pickup failed', saved.reason);
+      if (mailed.status === 'fulfilled') job.emailed = true; else console.warn('FormSubmit email failed', mailed.reason);
+      updatePickup(pickup.id, p => { p.emailStatus = job.emailed ? 'sent' : 'failed'; p.saved = job.saved; p.emailError = job.emailed ? '' : String(mailed.reason && mailed.reason.message || mailed.reason || ''); });
+      if (job.saved || job.emailed) {
         root.innerHTML = `<div class="success-box pu-result ok"><div class="tick">✅</div><h2>You're all set!</h2>
-          <p>The seller has been emailed your pickup details.</p>
+          <p>${job.emailed ? 'The seller has been emailed your pickup details.' : 'Your pickup has been sent to the seller\'s dashboard.'}</p>
           <p class="pu-recap">Meet at <strong>${esc(pickup.meetup)}</strong> at <strong>${esc(pickup.time.toLowerCase())}</strong> and bring <strong>${money(pickup.price)} cash</strong>.</p>
           <p class="muted">Reference ${esc(pickup.id)}</p>
           <button class="btn" type="button" data-done>Done</button></div>`;
         root.querySelector('[data-done]').addEventListener('click', closeModal);
         if (window.AV && AV.onDataChange) AV.onDataChange();
-      }).catch(e => {
-        updatePickup(pickup.id, p => { p.emailStatus = 'failed'; p.emailError = String(e && e.message || e); });
-        root.innerHTML = `<div class="success-box pu-result err"><div class="tick">⚠️</div><h2>Couldn't reach the seller</h2>
-          <p>Your pickup is saved, but we couldn't email the seller just now. Please check your internet connection and try again.</p>
-          <p class="muted">Still stuck? Call the owner on <a href="tel:${OWNER_PHONE}">${OWNER_PHONE}</a> and quote ${esc(pickup.id)}.</p>
-          <div class="pu-nav"><button class="btn outline" type="button" data-done>Close</button><button class="btn" type="button" data-retry>Try again</button></div></div>`;
-        root.querySelector('[data-done]').addEventListener('click', closeModal);
-        root.querySelector('[data-retry]').addEventListener('click', submit);
-        if (window.AV && AV.onDataChange) AV.onDataChange();
-      });
+      } else {
+        failScreen("Couldn't reach the seller", `Your ${isBid ? 'bid stands' : 'purchase is confirmed'}, but we couldn't send your pickup details just now. Please check your internet connection and try again.`, true);
+      }
     }
 
     render();
@@ -375,8 +358,7 @@
     form.addEventListener('submit', e => {
       e.preventDefault();
       if (checkCode(input.value)) {
-        try { sessionStorage.setItem(KEYS.seller, '1'); } catch (er) {}
-        window.location.href = 'seller.html';
+        window.location.href = 'seller.html'; // the dashboard then asks for the owner's email sign-in
       } else {
         msg.textContent = 'Invalid code'; input.select();
         setTimeout(() => { msg.textContent = ''; }, 3000);
@@ -420,7 +402,7 @@
   document.addEventListener('DOMContentLoaded', renderChrome);
 
   window.AV = Object.assign(window.AV || {}, {
-    KEYS, CATEGORIES, OWNER_PHONE, HOUR, getItems, saveItems, getItem, updateItem, resetItems,
+    KEYS, CATEGORIES, OWNER_PHONE, HOUR, getItems, getItem, myBid, setMyBid,
     salePrice, minNextBid, money, esc, timeLeft, thumbHTML, getCart, addToCart, openCart, openCheckout,
     openModal, closeModal, toast, checkCode, read, write,
     startPickup, getPickups, savePickups, updatePickup, sendPickupEmail, pickupPayload, MEETUP_POINTS, MEETUP_TIMES, PICKUP_ENDPOINT

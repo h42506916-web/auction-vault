@@ -25,7 +25,7 @@
     { id: 'returns', kw: /return|refund|exchange|money back|send (it )?back|change my mind/i,
       a: 'Returns: Auction items and mystery vaults are sold as-is, so change-of-mind returns aren\'t offered. If an item is significantly not as described, contact us within 7 days of receiving it and we\'ll make it right.' },
     { id: 'account', kw: /account|log ?in|sign ?(in|up)|register|password|username|profile|my details/i,
-      a: 'Account: You don\'t need an account to browse, bid or check out on this site. Your bids and cart are saved in your browser. If you need to update your details on an order, include your order number when you contact us.' },
+      a: 'Account: You don\'t need an account to browse, bid or check out on this site. Bids and Buy It Now purchases are saved online, so the seller sees them straight away; your cart is saved in your browser. If you need to update your details on an order, include your order number when you contact us.' },
     { id: 'hours', kw: /opening hours|\bhours\b|what time|when (are|do) you (open|close)|are you open|open (on|today|tomorrow|now|weekends?|sundays?|saturdays?)|closing time|business hours|public holiday/i,
       a: 'Opening hours: Mon–Fri 9am–5pm, Sat 10am–2pm, closed Sundays and public holidays. Online auctions run 24/7.' },
     { id: 'contact', kw: /contact|phone|\bcall\b|email|speak to|talk to|human|real person|owner|phone number/i,

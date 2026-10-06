@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><script src="js/common.js"></script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js"></script><script src="js/db.js"></script><script src="js/common.js"></script>
 <title>Storage Units — Auction Vault</title></head>
 <body data-page="storage">
 <header id="site-header"></header>
@@ -13,29 +13,5 @@
   </section>
 </main>
 <footer id="site-footer"></footer>
-<script>
-(function(){
-  const tiers = [
-    {id:'vault-bronze', cls:'', name:'The Starter Vault', emoji:'🔐', price:20, perks:['Entry-level mystery','A great first unlock','Instant confirmation']},
-    {id:'vault-silver', cls:'t-silver', name:'The Silver Vault', emoji:'🗝️', price:50, perks:['Step-up mystery tier','Better odds of a standout find','Priority confirmation']},
-    {id:'vault-gold', cls:'t-gold featured', name:'The Gold Vault', emoji:'👑', price:100, ribbon:'Most Popular', perks:['Premium mystery tier','Our most-loved surprise','VIP support line']},
-    {id:'vault-black', cls:'t-black', name:'The Black Vault', emoji:'🖤', price:250, ribbon:'Limited', perks:['Top-secret tier','Extremely limited','Personal call from the owner']}
-  ];
-  const el = document.getElementById('tiers');
-  el.innerHTML = tiers.map(t => `
-    <div class="tier ${t.cls}">
-      ${t.ribbon ? '<span class="ribbon">'+t.ribbon+'</span>' : ''}
-      <div class="vault-art">${t.emoji}</div>
-      <h3>${t.name}</h3>
-      <div class="price">${AV.money(t.price)}</div>
-      <ul>${t.perks.map(p=>'<li>'+p+'</li>').join('')}</ul>
-      <button class="btn" data-id="${t.id}">Buy Now</button>
-    </div>`).join('');
-  el.addEventListener('click', e => {
-    const b = e.target.closest('[data-id]'); if (!b) return;
-    const t = tiers.find(x => x.id === b.dataset.id);
-    AV.addToCart({name: t.name, price: t.price, emoji: t.emoji, kind: 'Mystery Storage Vault'});
-  });
-})();
-</script>
+<script src="js/storage.js"></script>
 </body></html>
