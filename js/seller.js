@@ -56,13 +56,13 @@
   }
   async function loadItems() {
     $('#rows').innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">Loading…</td></tr>';
-    try { items = await db.admin.items(); renderRows(); } catch (e) { dashError(e); $('#rows').innerHTML = ''; }
+    try { items = await db.admin.items(); renderRows(); if (pickups.length) renderDebts(); } catch (e) { dashError(e); $('#rows').innerHTML = ''; }
   }
   async function loadTiers() {
-    try { tiers = await db.admin.tiers(); renderTiers(); if (pickups.length) renderPickups(); } catch (e) { dashError(e); }
+    try { tiers = await db.admin.tiers(); renderTiers(); if (pickups.length) { renderPickups(); renderDebts(); } } catch (e) { dashError(e); }
   }
   async function loadPickups() {
-    try { pickups = await db.admin.pickups(); renderPickups(); } catch (e) { dashError(e); }
+    try { pickups = await db.admin.pickups(); renderPickups(); renderDebts(); } catch (e) { dashError(e); }
   }
   // Run a write; on success reload, on failure show why.
   async function save(fn, okMsg, reload) {
@@ -200,7 +200,7 @@
       return `<tr data-id="${AV.esc(p.id)}" class="${p.collected ? 'collected' : ''}">
         <td style="white-space:nowrap">${AV.esc(new Date(p.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }))}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.reference)}</span></td>
         <td><span class="em-inline">${AV.esc((it && it.emoji) || '📦')}</span> <strong>${AV.esc(p.item_name)}</strong><br><span class="tag">${AV.esc(AV.typeLabel(p.purchase_type))}</span></td>
-        <td><strong>${AV.money(p.price)}</strong><br><span class="muted" style="font-size:.75rem">💵 Cash at meet-up</span></td>
+        <td><strong>${AV.money(p.price)}</strong><br>${p.paid ? '<span class="tag paid">✓ Paid</span>' : '<span class="muted" style="font-size:.75rem">💵 Cash at meet-up</span>'}</td>
         <td><strong>${AV.esc(p.buyer_name)}</strong>${p.class ? `<br><span class="muted">${AV.esc(p.class)}</span>` : ''}${p.contact ? `<br><span class="muted">${AV.esc(p.contact)}</span>` : ''}</td>
         <td><strong>${AV.esc(p.meetup)}</strong><br>${AV.esc(p.time)}</td>
         <td style="white-space:nowrap"><button class="btn small ${p.collected ? 'grey' : 'outline'}" data-pu="collected">${p.collected ? '✓ Collected' : 'Mark collected'}</button> <button class="btn small danger" data-pu="del">Remove</button></td>
@@ -220,6 +220,101 @@
     }
   }
 
+  /* ---------- Debts / receipts ---------- */
+  // Unpaid pickups grouped by buyer (name + class, case-insensitive). "paid" comes from
+  // supabase/migration_004.sql; before it runs every pickup counts as unpaid.
+  const norm = v => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const buyerKey = p => norm(p.buyer_name) + '|' + norm(p.class);
+  const cents = n => Math.round(Number(n || 0) * 100);
+  const sumMoney = list => list.reduce((t, p) => t + cents(p.price), 0) / 100;
+  const fmtDate = (v, withTime) => { const d = new Date(v); return isNaN(d) ? '' : d.toLocaleString('en-AU', withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }); };
+  const paidSupported = () => !pickups.length || Object.prototype.hasOwnProperty.call(pickups[0], 'paid');
+  function debtGroups() {
+    const groups = new Map();
+    pickups.filter(p => !p.paid).slice().sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)).forEach(p => {
+      const k = buyerKey(p);
+      if (!groups.has(k)) groups.set(k, { key: k, name: p.buyer_name, cls: p.class, contacts: [], lines: [] });
+      const g = groups.get(k);
+      g.name = String(p.buyer_name || '').trim().replace(/\s+/g, ' '); g.cls = p.class; // show the latest spelling
+      if (p.contact && !g.contacts.some(c => norm(c) === norm(p.contact))) g.contacts.push(p.contact);
+      g.lines.push(p);
+    });
+    return [...groups.values()].map(g => Object.assign(g, { total: sumMoney(g.lines) })).sort((a, b) => b.total - a.total || norm(a.name).localeCompare(norm(b.name)));
+  }
+  function outbidNote(p) {
+    if (p.purchase_type !== 'Highest bid' || !p.item_id) return '';
+    const it = items.find(i => i.id === p.item_id);
+    return it && it.currentBid > Number(p.price) ? `<div class="r-warn">⚠ Outbid — top offer is now ${AV.money(it.currentBid)}</div>` : '';
+  }
+  function receiptHTML(g) {
+    const row = (k, v) => v ? `<div class="r-row"><span>${k}</span><span>${AV.esc(v)}</span></div>` : '';
+    return `<article class="receipt" data-key="${AV.esc(g.key)}">
+      <div class="r-head"><div class="r-brand">AUCTION VAULT</div><div class="r-sub">Cash receipt · amount owing</div></div>
+      <div class="r-cut"></div>
+      ${row('Buyer', g.name)}${row('Class', g.cls)}${row('Contact', g.contacts.join(', '))}
+      <div class="r-cut"></div>
+      ${g.lines.map(p => `<div class="r-line" data-id="${AV.esc(p.id)}">
+        <label class="r-paid" title="Tick when this has been paid"><input type="checkbox" data-paid="one" aria-label="Mark ${AV.esc(p.item_name)} paid"> Paid</label>
+        <div class="r-item"><div class="r-row r-strong"><span>${AV.esc(p.item_name)}</span><span>${AV.money(p.price)}</span></div>
+          <div class="r-meta">${AV.esc(AV.typeLabel(p.purchase_type))} · ${AV.esc(fmtDate(p.created_at))} · Ref ${AV.esc(p.reference)}</div>
+          <div class="r-meta">Meet-up: ${AV.esc(p.meetup)} · ${AV.esc(p.time)}${p.collected ? ' · <strong>collected</strong>' : ''}</div>
+          ${outbidNote(p)}</div>
+      </div>`).join('')}
+      <div class="r-cut"></div>
+      <div class="r-row r-total"><span>TOTAL OWED</span><span>${AV.money(g.total)}</span></div>
+      <div class="r-foot">💵 Cash only · ${g.lines.length} item${g.lines.length === 1 ? '' : 's'}</div>
+      <button class="btn small" type="button" data-paid="all" style="width:100%;margin-top:10px">Mark all paid — ${AV.money(g.total)}</button>
+    </article>`;
+  }
+  function renderDebts() {
+    const groups = debtGroups();
+    $('#debt-n').textContent = groups.length;
+    $('#debt-total').textContent = AV.money(groups.reduce((t, g) => t + cents(g.total), 0) / 100);
+    $('#debt-msg').textContent = paidSupported() ? '' : 'Paid tracking is not set up yet: run supabase/migration_004.sql in the Supabase SQL Editor. Receipts are shown, but ticking Paid will not save until then.';
+    $('#debt-cards').innerHTML = groups.map(receiptHTML).join('') || '<p class="muted" style="text-align:center;padding:18px;margin:0">🎉 Nobody owes you anything right now.</p>';
+    const paid = pickups.filter(p => p.paid).sort((a, b) => Date.parse(b.paid_at || 0) - Date.parse(a.paid_at || 0));
+    $('#paid-n').textContent = paid.length;
+    $('#paid-total').textContent = AV.money(sumMoney(paid));
+    $('#paid-rows').innerHTML = paid.map(p => `<tr data-id="${AV.esc(p.id)}">
+        <td style="white-space:nowrap">${AV.esc(fmtDate(p.paid_at, true) || '—')}</td>
+        <td><strong>${AV.esc(p.buyer_name)}</strong>${p.class ? ` <span class="muted">${AV.esc(p.class)}</span>` : ''}</td>
+        <td>${AV.esc(p.item_name)}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.reference)}</span></td>
+        <td><strong>${AV.money(p.price)}</strong></td>
+        <td><button class="btn small outline" type="button" data-paid="undo">Undo</button></td>
+      </tr>`).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">Nothing marked paid yet.</td></tr>';
+  }
+  async function setPaid(ids, paid, controls) {
+    controls.forEach(c => { c.disabled = true; });
+    $('#debt-msg').textContent = '';
+    try {
+      await db.admin.markPaid(ids, paid);
+      const at = new Date().toISOString();
+      pickups.forEach(p => { if (ids.includes(p.id)) { p.paid = paid; p.paid_at = paid ? (p.paid_at || at) : null; } });
+      AV.toast(paid ? (ids.length > 1 ? `${ids.length} items marked paid` : 'Marked paid') : 'Moved back to debts');
+      renderDebts(); renderPickups();
+      loadPickups(); // sync paid_at etc. from the database
+    } catch (e) {
+      const t = db.friendly(e);
+      $('#debt-msg').textContent = '⚠ Could not save: ' + t; AV.toast(t); console.error(e);
+      controls.forEach(c => { c.disabled = false; if (c.type === 'checkbox') c.checked = !paid; });
+    }
+  }
+  function onDebtClick(e) {
+    const c = e.target.closest('[data-paid]'); if (!c || c.disabled) return;
+    const kind = c.dataset.paid;
+    if (kind === 'one') {
+      const id = c.closest('.r-line').dataset.id;
+      setPaid([id], true, [c]);
+    } else if (kind === 'all') {
+      const card = c.closest('.receipt');
+      const g = debtGroups().find(x => x.key === card.dataset.key); if (!g) return;
+      if (!confirm(`Mark all ${g.lines.length} item${g.lines.length === 1 ? '' : 's'} for ${g.name} as paid (${AV.money(g.total)})?`)) return;
+      setPaid(g.lines.map(p => p.id), true, [c, ...card.querySelectorAll('[data-paid="one"]')]);
+    } else if (kind === 'undo') {
+      setPaid([c.closest('tr').dataset.id], false, [c]);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', async () => {
     $('#f-cat').innerHTML = AV.CATEGORIES.map(c => `<option>${AV.esc(c)}</option>`).join('');
     $('#login-email').value = db.adminEmail; setSendLabel();
@@ -235,6 +330,9 @@
     $('#refresh').addEventListener('click', refreshAll);
     $('#tier-rows').addEventListener('click', onTierClick);
     $('#pu-rows').addEventListener('click', onPickupClick);
+    $('#debt-cards').addEventListener('change', e => { if (e.target.matches('[data-paid="one"]')) onDebtClick(e); });
+    $('#debt-cards').addEventListener('click', e => { if (e.target.matches('button[data-paid]')) onDebtClick(e); });
+    $('#paid-rows').addEventListener('click', onDebtClick);
     AV.onDataChange = null;
     try {
       // Also completes a magic-link sign-in (#access_token=… in the URL)

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css?v=20261006"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js?v=20261006"></script><script src="js/db.js?v=20261006"></script><script src="js/common.js?v=20261006"></script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css?v=20261006b"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js?v=20261006b"></script><script src="js/db.js?v=20261006b"></script><script src="js/common.js?v=20261006b"></script>
 <meta name="robots" content="noindex,nofollow">
 <title>Seller Dashboard — Auction Vault</title></head>
 <body data-page="seller">
@@ -27,7 +27,7 @@
     <button class="btn" type="button" id="signout2">Sign out</button>
   </div>
   <div id="dash" class="hidden">
-    <div class="page-head"><h1>Seller Dashboard</h1><p>List items for sale, edit or remove them, set discounts, mark items sold, change vault guide prices and see buyers' offers and cash meet-ups. Changes are saved online and show up for every visitor straight away.</p></div>
+    <div class="page-head"><h1>Seller Dashboard</h1><p>List items for sale, edit or remove them, set discounts, mark items sold, change vault guide prices and see buyers' offers and cash meet-ups, and track who still owes you money. Changes are saved online and show up for every visitor straight away.</p></div>
     <div class="msg err" id="dash-msg" role="alert"></div>
     <div class="seller-grid">
       <div class="panel">
@@ -66,6 +66,19 @@
       <h3 style="margin:0">Storage Vault Guide Prices</h3>
       <div class="table-wrap"><table class="items"><thead><tr><th></th><th>Vault</th><th>Price ($)</th><th>Shown</th><th></th></tr></thead><tbody id="tier-rows"></tbody></table></div>
     </div>
+    <div class="panel pickups-panel" id="debts">
+      <div class="debts-head">
+        <div><h3 style="margin:0">Debts / Receipts (<span id="debt-n">0</span>)</h3>
+          <span class="muted" style="font-size:.8rem">What each buyer owes for pickups and offers not yet paid. Tick <strong>Paid</strong> when you get the cash.</span></div>
+        <div class="debt-grand"><span>Total owed</span><strong id="debt-total">$0.00</strong></div>
+      </div>
+      <div class="msg err" id="debt-msg" role="alert"></div>
+      <div class="receipts" id="debt-cards"></div>
+      <details class="paid-history" id="paid-history">
+        <summary>Paid history (<span id="paid-n">0</span>) · <span id="paid-total">$0.00</span> received</summary>
+        <div class="table-wrap"><table class="items"><thead><tr><th>Paid</th><th>Buyer</th><th>Item</th><th>Amount</th><th></th></tr></thead><tbody id="paid-rows"></tbody></table></div>
+      </details>
+    </div>
     <div class="panel pickups-panel" id="pickups">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <h3 style="margin:0">Pickups &amp; offers (<span id="pu-n">0</span>)</h3>
@@ -76,5 +89,5 @@
   </div>
 </main>
 <footer id="site-footer"></footer>
-<script src="js/seller.js?v=20261006"></script>
+<script src="js/seller.js?v=20261006b"></script>
 </body></html>

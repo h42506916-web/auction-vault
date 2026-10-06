@@ -217,6 +217,42 @@ table.items input.disc{width:60px;padding:5px;border:1px solid #cfd2d6;border-ra
 table.pickups td{vertical-align:top}
 table.pickups tr.collected td{opacity:.55}
 .em-inline{font-size:1.2rem}
+/* Debts / receipts (seller page) */
+.debts-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.debt-grand{background:var(--navy);color:#fff;border-radius:10px;padding:8px 16px;text-align:right;font-family:var(--head)}
+.debt-grand span{display:block;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;opacity:.8}
+.debt-grand strong{font-size:1.5rem;font-weight:800}
+.receipts{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;align-items:start}
+.receipt{font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace;font-size:.82rem;color:var(--text);background:#fcfcfa;border:1px solid var(--grey-light);border-top:6px solid var(--navy);border-radius:4px 4px 0 0;padding:16px 16px 22px;box-shadow:var(--shadow);position:relative;
+  -webkit-mask:linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/14px 8px repeat-x;
+  mask:linear-gradient(#000 0 0) top/100% calc(100% - 8px) no-repeat,conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) bottom/14px 8px repeat-x}
+.r-head{text-align:center}
+.r-brand{font-weight:800;letter-spacing:.3em;color:var(--navy)}
+.r-sub{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--grey)}
+.r-cut{border-top:2px dashed var(--grey);margin:10px 0;opacity:.7}
+.r-row{display:flex;justify-content:space-between;gap:10px}
+.r-row>span:first-child{color:#4a5160}
+.r-row>span:last-child{text-align:right;word-break:break-word}
+.r-strong>span:first-child{color:var(--text);font-weight:700}
+.r-strong>span:last-child{font-weight:700;white-space:nowrap}
+.r-line{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px dotted var(--grey-light)}
+.r-line:last-of-type{border-bottom:0}
+.r-item{flex:1;min-width:0}
+.r-meta{font-size:.7rem;color:var(--grey)}
+.r-warn{font-size:.7rem;color:var(--sale);font-weight:700}
+.r-paid{display:flex;flex-direction:column;align-items:center;font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--navy);font-weight:700;cursor:pointer;padding-top:2px}
+.r-paid input{width:18px;height:18px;accent-color:var(--success);cursor:pointer;margin:0 0 2px}
+.r-total{font-size:1rem;font-weight:800;color:var(--navy)}
+.r-total>span:first-child{color:var(--navy);letter-spacing:.12em}
+.r-foot{text-align:center;font-size:.68rem;color:var(--grey);margin-top:6px;letter-spacing:.08em}
+.paid-history{margin-top:16px;border-top:1px solid var(--grey-light);padding-top:10px}
+.paid-history summary{cursor:pointer;font-family:var(--head);font-weight:700;color:var(--navy);letter-spacing:.06em;font-size:.85rem}
+.tag.paid{background:#e3f4ec;color:var(--success)}
+/* Top offer badge (auction page) */
+.top-offer{font-size:.76rem;color:var(--navy);background:var(--grey-bg);border:1px solid var(--grey-light);border-radius:6px;padding:3px 8px;align-self:flex-start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-offer strong{font-weight:800}
+.top-offer.none{color:var(--grey)}
+.detail .top-offer{font-size:.85rem;margin:4px 0 2px;white-space:normal}
 .pu-status{font-weight:700;font-size:.78rem;white-space:nowrap}
 .pu-status.ok{color:var(--success)} .pu-status.fail{color:var(--danger)}
 @media (max-width:520px){.pu-steps li em{display:none}.pu-item{margin-right:30px}}

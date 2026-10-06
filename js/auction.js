@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
-  const state = { q: '', cat: '', sort: 'ending', deals: false, loaded: false };
+  const state = { q: '', cat: '', sort: 'ending', deals: false, loaded: false, top: {}, topLoaded: false };
   const REFRESH_MS = 30000;
   let openId = null;
 
@@ -60,6 +60,7 @@
     if (showSpinner) { $('#count').textContent = ''; $('#grid').innerHTML = AV.db.loadingHTML('Loading auction items…'); }
     try {
       await AV.db.loadItems(); state.loaded = true; render();
+      loadTop();
     } catch (e) {
       console.error(e);
       if (!state.loaded) {
@@ -68,6 +69,22 @@
         $('#grid [data-retry]').addEventListener('click', () => load(true));
       }
     }
+  }
+
+  // Who has the highest offer on each item (public: amount + bidder name only).
+  async function loadTop() {
+    try { state.top = await AV.db.topOffers(AV.getItems()); state.topLoaded = true; render(); updateDetailTop(); }
+    catch (e) { console.warn('Top offers unavailable', e); }
+  }
+  function topHTML(it) {
+    const t = state.top[it.id];
+    if (t) return `<div class="top-offer" title="Highest offer so far">🏆 Top offer: <strong>${AV.money(t.amount)}</strong> by <strong>${AV.esc(t.by)}</strong></div>`;
+    if (!it.bidCount) return '<div class="top-offer none">No offers yet</div>';
+    return state.topLoaded ? '' : '<div class="top-offer none">Top offer: loading…</div>';
+  }
+  function updateDetailTop() {
+    const el = openId && document.querySelector('#av-modal #top-offer'); const it = openId && AV.getItem(openId);
+    if (el && it) el.outerHTML = topHTML(it).replace('class="top-offer', 'id="top-offer" class="top-offer');
   }
 
   function filtered() {
@@ -121,6 +138,7 @@
           <div class="card-title">${AV.esc(it.name)}</div>
           <div class="bid-line">${offerLine(n)}</div>
           <div class="bid-amt">${AV.money(n ? it.currentBid : it.startBid)}</div>
+          ${topHTML(it)}
           ${priceBlock(it)}
           <div class="timer ${tl.ending && !closed ? 'ending' : ''}" data-ends="${it.endsAt}" ${it.sold ? 'data-sold="1"' : ''}>${timerText(it, tl)}</div>
         </div>
@@ -204,6 +222,7 @@
           <p>${AV.esc(it.description || 'No description provided.')}</p>
           <div class="bid-line">${offerLine(n)}</div>
           <div class="bid-amt" style="font-size:1.8rem">${AV.money(n ? it.currentBid : it.startBid)}</div>
+          ${topHTML(it).replace('class="top-offer', 'id="top-offer" class="top-offer')}
           <div class="timer ${tl.ending && !closed ? 'ending' : ''}" data-ends="${it.endsAt}" ${it.sold ? 'data-sold="1"' : ''}>${timerText(it, tl, ' left')}</div>
           ${closed ? `<p class="msg err">${it.sold ? 'This item has been sold.' : 'This auction has ended.'}</p>` : `
           <form class="bid-form" id="bid-form">
@@ -225,7 +244,11 @@
     openId = id;
     setItemParam(id);
     body.querySelector('#copy-link').addEventListener('click', () => copyLink(id));
-    if (n) AV.db.itemBids(id).then(b => { const h = body.querySelector('#history'); if (h) h.innerHTML = historyHTML(b); })
+    if (n) AV.db.itemBids(id).then(b => {
+      const h = body.querySelector('#history'); if (h) h.innerHTML = historyHTML(b);
+      const top = b.reduce((a, x) => (!a || x.amount > a.amount) ? x : a, null);
+      if (top) { state.top[id] = top; if (openId === id) updateDetailTop(); }
+    })
       .catch(() => { const h = body.querySelector('#history'); if (h) h.innerHTML = '<strong>Offer history</strong><div>Offer history is unavailable right now.</div>'; });
     const form = body.querySelector('#bid-form');
     if (form) {
@@ -259,6 +282,7 @@
         }
         Object.assign(cur, { currentBid: Number(r.current_bid), bidCount: Number(r.bid_count) });
         AV.setMyBid(id, Number(r.current_bid));
+        state.top[id] = { amount: Number(r.current_bid), by: name, at: Date.now() };
         const saved = AV.read(AV.KEYS.buyer, {}) || {}; AV.write(AV.KEYS.buyer, Object.assign(saved, { name }));
         render();
         // Offer accepted → cash-only meet-up flow.

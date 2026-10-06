@@ -40,6 +40,10 @@
     return m || 'Something went wrong. Please try again.';
   }
 
+  // A function added by a migration that has not been run yet (PostgREST: PGRST202 / 404)
+  const missingFn = err => /PGRST202|42883/.test(err.code || '') || /could not find the function|does not exist|schema cache/i.test(err.message || '');
+  const MIGRATION_004 = 'Paid tracking is not set up yet. Run supabase/migration_004.sql in the Supabase SQL Editor, then try again.';
+
   const num = v => (v == null ? 0 : Number(v));
   function fromRow(r) {
     return {
@@ -75,6 +79,27 @@
     },
     async itemBids(id) {
       return check(await sb().rpc('item_bids', { p_item_id: id })).map(b => ({ amount: num(b.amount), by: b.bidder_name, at: Date.parse(b.created_at) }));
+    },
+
+    // Highest offer per item: { [itemId]: { amount, by, at } }. Uses top_offers() (migration_004.sql);
+    // before that migration runs, falls back to item_bids() for each item that has offers.
+    async topOffers(items) {
+      const out = {};
+      const res = await sb().rpc('top_offers');
+      if (!res.error) {
+        (res.data || []).forEach(r => { out[r.item_id] = { amount: num(r.amount), by: r.bidder_name || 'Anonymous', at: Date.parse(r.created_at) }; });
+        return out;
+      }
+      if (!missingFn(res.error)) check(res);
+      const withBids = (items || cache).filter(it => it.bidCount > 0);
+      await Promise.all(withBids.map(async it => {
+        try {
+          const bids = await db.itemBids(it.id);
+          const top = bids.reduce((a, b) => (!a || b.amount > a.amount || (b.amount === a.amount && b.at < a.at)) ? b : a, null);
+          if (top) out[it.id] = top;
+        } catch (e) { /* leave this item without a top offer */ }
+      }));
+      return out;
     },
 
     /* ----- public writes (RPC, validated in the database) ----- */
@@ -116,7 +141,13 @@
       async updateTier(id, patch) { return tierFromRow(check(await sb().from('storage_tiers').update(patch).eq('id', id).select().single())); },
       async pickups() { return check(await sb().from('pickups').select('*').order('created_at', { ascending: false })); },
       async updatePickup(id, patch) { return check(await sb().from('pickups').update(patch).eq('id', id).select().single()); },
-      async deletePickup(id) { return check(await sb().from('pickups').delete().eq('id', id)); }
+      async deletePickup(id) { return check(await sb().from('pickups').delete().eq('id', id)); },
+      // Debts / receipts: mark pickups paid or unpaid (admin-only RPC from supabase/migration_004.sql)
+      async markPaid(ids, paid) {
+        const res = await sb().rpc('mark_pickups_paid', { p_ids: ids, p_paid: !!paid });
+        if (res.error && missingFn(res.error)) throw new Error(MIGRATION_004);
+        return check(res);
+      }
     }
   };
 
