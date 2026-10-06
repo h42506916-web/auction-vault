@@ -31,7 +31,7 @@
     { id: 'contact', kw: /contact|phone|\bcall\b|email|speak to|talk to|human|real person|owner|phone number/i,
       a: `Contact: You can reach the owner by phone on ${TEL} during opening hours.` },
     { id: 'vault', kw: /vault|storage|unit|mystery|tier|what'?s inside|contents/i,
-      a: 'Mystery Vaults: Our "Storage Units" are mystery vault products, not physical storage spaces. Choose a tier on the Storage Units page, check out, and the contents are revealed after purchase. Higher tiers mean a more premium mystery.' },
+      a: 'Storage Units: Choose a tier on the Storage Units page, check out, and the contents are revealed after purchase. Higher tiers mean a more premium mystery.' },
     { id: 'discount', kw: /discount|sale|deal|coupon|promo|voucher|% ?off|cheap/i,
       a: 'Deals: Discounted items show an orange "% OFF" badge on the Auction page. Tick "Deals only" to see them all. Discounts apply to the Buy It Now price.' },
     { id: 'fees', kw: /fee|premium|commission|gst|tax|extra charge|hidden cost/i,
