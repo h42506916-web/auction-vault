@@ -51,6 +51,157 @@
     return `<div class="thumb">${extra || ''}<span aria-hidden="true">${esc(it.emoji || '📦')}</span>${img}</div>`;
   }
 
+  /* ---------- Buyer entry check (name / class / contact on every offer + pickup form) ----------
+     Rejects joke or fake entries: placeholder words, keyboard mash and rude words (incl. leetspeak
+     and spaced-out letters). Any genuine name is fine — first name only, nicknames, hyphens,
+     apostrophes and non-English letters all pass. The database repeats a simpler version of this
+     (public.is_bad_entry / is_bad_name in supabase/migration_003.sql), so it can't be bypassed. */
+  const ENTRY_MSG_NAME = 'Invalid — please enter your real name';
+  const ENTRY_MSG = 'Invalid entry';
+  const ENTRY_RULES = {
+    // whole-entry placeholders (an entry made only of these words / numbers is rejected)
+    placeholders: ('test tests testing tester testname asdf asdfg asdfgh asdfghjkl asd sdf dfg jkl qwe qwer qwert qwerty ' +
+      'zxc zxcv abc abcd abcde abcdef abcdefg xyz aaa xxx zzz none nothing na nil null undefined idk dunno name myname ' +
+      'yourname noname firstname lastname fullname surname blah blahblah bla fake fakename anonymous anon nobody noone ' +
+      'someone somebody unknown lol lmao lmfao rofl lel xd haha hehe hello hi hey hiya yo sdfsdf jkljkl foo foobar user ' +
+      'username guest me myself nope no nah yes yeah ok okay whatever random idc student person human thing stuff ' +
+      'class contact phone email number mobile n/a').split(' '),
+    // rude words matched as a whole word (plurals and compounds like "...head" / "...face" too)
+    whole: ('shit shite shitty shitter crap crappy cunt dick cock prick twat tit tits titty titties boob boobs booby ass arse ' +
+      'asshat butthole buttface bastard piss pissed pisser wank bollocks bollock bugger slut slag skank douche douchebag ' +
+      'idiot stupid dumb moron loser retard retarded poop poopy sex sexy porn porno nude nudes nazi hitler kys stfu gtfo ' +
+      'wtf omfg milf cum jizz spunk knob knobhead nob bellend tosser pussy fag fags chink spic kike wog paki gook tranny ' +
+      'homo lesbo rape rapist pedo paedo pedophile paedophile suck sucks balls fart turd booger ugly fatso fatty noob ' +
+      'fuk fuq fck fcuk fuc fk fkn fking effing phuk phuck biatch penis vagina').split(' '),
+    // rude words caught even inside a longer word ("dumbass", "fuuuck", "b1tches")
+    embed: ('fuck motherf nigger nigga faggot bitch asshole arsehole dickhead shithead bullshit horseshit chickenshit ' +
+      'batshit apeshit dipshit cocksucker wanker whore dumbass jackass smartass fatass lardass kissass badass retard dildo ' +
+      'blowjob handjob jizz pussy twat').split(' '),
+    compounds: 'head face hole hat bag wad wipe stain lord licker sucker nugget brain weasel'.split(' '),
+    // joke names
+    phrases: ['ben dover', 'bend over', 'mike hunt', 'mike hawk', 'mike oxlong', 'mike litoris', 'hugh jass', 'hugh janus',
+      'amanda hugginkiss', 'seymour butts', 'harry balls', 'joe mama', 'yo mama', 'ur mom', 'your mom', 'ur mum', 'your mum',
+      'deez nuts', 'ligma', 'sugma', 'phil mccracken', 'dixie normous', 'ivana tinkle', 'heywood jablome', 'moe lester',
+      'john doe', 'jane doe', 'joe bloggs', 'your name', 'my name', 'first last', 'first name', 'last name'],
+    // keyboard mash (4-letter runs that never appear in real names, plus any 5-letter run along a key row)
+    keys4: 'asdf sdfg dfgh fghj ghjk hjkl qwer zxcv xcvb cvbn vbnm poiu lkjh kjhg jhgf hgfd gfds fdsa rewq vcxz mnbv bvcx'.split(' '),
+    rows: ['qwertyuiop', 'asdfghjkl', 'zxcvbnm']
+  };
+  // letters and the look-alikes people use to dodge filters (sh1t, f*ck, a$$, b!tch)
+  const LEET = { a: 'a4@', b: 'b8', e: 'e3', g: 'g9', i: 'i1!|', l: 'l1|', o: 'o0', s: 's5$', t: 't7+', u: 'uv' };
+  const leetWord = w => w.split('').map(c => '[' + (LEET[c] || c) + '*]+').join('');
+  const RX = (() => {
+    const R = ENTRY_RULES;
+    const keyRuns = R.keys4.slice();
+    R.rows.forEach(r => { for (const s of [r, r.split('').reverse().join('')]) for (let i = 0; i + 5 <= s.length; i++) keyRuns.push(s.slice(i, i + 5)); });
+    return {
+      whole: new RegExp('^(?:' + R.whole.map(leetWord).join('|') + ')(?:e?s)?(?:(?:' + R.compounds.join('|') + ')(?:e?s)?)?$'),
+      embed: new RegExp(R.embed.map(leetWord).join('|')),
+      keys: new RegExp(keyRuns.join('|')),
+      placeholders: new Set(R.placeholders.map(p => p.replace(/[^a-z]/g, '')))
+    };
+  })();
+
+  // → { ok: true } or { ok: false, reason, message }. field: 'name' (required) | 'class' | 'contact' (optional)
+  function validateEntry(value, field) {
+    field = field === 'cls' ? 'class' : (field || 'name');
+    const isName = field === 'name', isContact = field === 'contact';
+    const message = isName ? ENTRY_MSG_NAME : ENTRY_MSG;
+    const bad = reason => ({ ok: false, reason, message });
+    const raw = String(value == null ? '' : value).replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').normalize('NFC').trim();
+    if (!raw) return isName ? bad('empty') : { ok: true };
+    if (isName && !/\p{L}/u.test(raw)) return bad('no_letters');
+    if (isName && raw.length < 2) return bad('too_short');
+    if (!isName && !/[\p{L}\p{N}]/u.test(raw)) return bad('symbols_only');
+
+    const base = raw.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+    const isEmail = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(base); // split emails at the @ (any field, same as the database)
+    // split into words; * $ @ ! | + stay inside a word because they stand in for letters
+    const parts = base.split(isEmail ? /[^\p{L}\p{N}*$!|+]+/u : /[^\p{L}\p{N}*$@!|+]+/u).filter(Boolean);
+    // "f u c k", "n/a", "a.s.s" → join runs of single characters into one word
+    const toks = [];
+    let run = '';
+    for (const p of parts) {
+      if ([...p].length === 1) { run += p; continue; }
+      if (run) { toks.push(run); run = ''; }
+      toks.push(p);
+    }
+    if (run) toks.push(run);
+    if (!toks.length) return bad('symbols_only');
+
+    // placeholders: the whole entry is only placeholder words (and numbers)
+    const own = isEmail ? base.split('@')[0].split(/[^\p{L}\p{N}]+/u).filter(Boolean) : toks; // test@test.com → "test"
+    const plain = own.map(t => t.replace(/[*$@!|+]/g, '').replace(/^\d+|\d+$/g, ''));
+    if (plain.some(t => RX.placeholders.has(t)) && plain.every(t => !t || RX.placeholders.has(t))) return bad('placeholder');
+
+    for (const t of toks) {
+      const letters = t.replace(/[^a-z]/g, '');
+      // rude words (only checked on words with a letter in them, so phone numbers are left alone)
+      if (letters && (RX.whole.test(t) || RX.embed.test(t))) return bad('rude');
+      // keyboard mash
+      if (letters && RX.keys.test(letters)) return bad('mash');
+      if (/^(.{2,4})\1{2,}$/.test(t)) return bad('mash');                       // hahaha, asdasdasd
+      const rep = /^(.{2,4})\1+$/.exec(t);                                       // asdasd, testtest
+      if (rep && RX.placeholders.has(rep[1])) return bad('mash');
+      if (isContact ? /(\p{L})\1{3}/u.test(t) : /(\p{L})\1{2}/u.test(t)) return bad('mash'); // aaaa
+      if (!isContact && /^[a-z]{5,}$/.test(t) && !/[aeiouy]/.test(t)) return bad('mash');     // no vowels
+      if ([...t].length > 40 && !(isContact && isEmail)) return bad('too_long');
+    }
+
+    const spaced = ' ' + toks.join(' ') + ' ', compact = toks.join('');
+    for (const ph of ENTRY_RULES.phrases) {
+      const c = ph.replace(/ /g, '');
+      if (spaced.includes(' ' + ph + ' ') || compact === c || toks.includes(c)) return bad('joke');
+    }
+    return { ok: true };
+  }
+  // Database rejection of a buyer entry (supabase/migration_003.sql) → field + message, else null
+  function entryError(r) {
+    const code = r && (r.error || r.code);
+    if (code !== 'invalid_entry' && code !== 'bad_name') return null;
+    const field = r.field === 'class' ? 'cls' : (r.field === 'contact' ? 'contact' : 'name');
+    return { field, message: field === 'name' ? ENTRY_MSG_NAME : ENTRY_MSG };
+  }
+  /* Live-check a set of inputs: an "Invalid" note under each bad field and the submit button disabled
+     until every field passes. fields: [{ input, field, note? }]. Returns { valid(), reject(field, value) }. */
+  function watchEntries(fields, button, onChange) {
+    const rejected = {}; // values the database refused (kept invalid until changed)
+    const check = f => {
+      const v = f.input.value;
+      if (rejected[f.field] != null && v.trim() === rejected[f.field]) return { ok: false, message: f.field === 'name' ? ENTRY_MSG_NAME : ENTRY_MSG };
+      return validateEntry(v, f.field);
+    };
+    const show = (f, r) => {
+      let el = f.note;
+      if (!el) { el = document.createElement('span'); el.className = 'field-err'; el.setAttribute('aria-live', 'polite'); f.input.insertAdjacentElement('afterend', el); f.note = el; }
+      const visible = !r.ok && f.touched;
+      el.textContent = visible ? r.message : '';
+      if (visible) f.input.setAttribute('aria-invalid', 'true'); else f.input.removeAttribute('aria-invalid');
+    };
+    const update = () => {
+      let all = true;
+      fields.forEach(f => { const r = check(f); if (!r.ok) all = false; show(f, r); });
+      if (button) button.disabled = !all;
+      if (onChange) onChange(all);
+      return all;
+    };
+    fields.forEach(f => {
+      f.touched = f.input.value.trim() !== ''; // prefilled values are checked straight away
+      let t;
+      f.input.addEventListener('input', () => {
+        clearTimeout(t);
+        if (f.input.getAttribute('aria-invalid')) update();                    // clear the note as soon as it's fixed
+        else { update(); t = setTimeout(() => { f.touched = f.input.value.trim() !== '' || f.touched; update(); }, 700); }
+      });
+      f.input.addEventListener('blur', () => { clearTimeout(t); f.touched = true; update(); });
+    });
+    update();
+    return {
+      valid: () => { fields.forEach(f => { f.touched = true; }); return update(); },
+      reject(field, value) { rejected[field] = String(value || '').trim(); const f = fields.find(x => x.field === field); if (f) f.touched = true; update(); }
+    };
+  }
+
   /* ---------- Modal + toast ---------- */
   function openModal(html, opts) {
     closeModal();
@@ -146,7 +297,7 @@
     const isFull = offer.type === 'Buy It Now';
     const prevVault = isVault ? getPickups().find(p => p.itemId === offer.itemId && p.type === 'Vault offer' && !p.collected) : null;
     const st = { i: 0, name: saved.name || '', cls: saved.cls || '', contact: saved.contact || '', meetup: '', time: '',
-      amount: isVault ? (prevVault ? Number(prevVault.price) : null) : Number(offer.price), done: false };
+      amount: isVault ? (prevVault ? Number(prevVault.price) : null) : Number(offer.price), done: false, rejected: null };
     const STEPS = isVault
       ? [['offer', 'Your offer'], ['meetup', 'Meet-up point'], ['time', 'Time'], ['confirm', 'Reminder']]
       : [['cash', 'Cash only'], ['details', 'Your details'], ['meetup', 'Meet-up point'], ['time', 'Time'], ['confirm', 'Confirm']];
@@ -239,6 +390,10 @@
       const next = root.querySelector('[data-nav="next"]');
       if (isForm()) {
         const f = root.querySelector('#pu-form');
+        // Name, class and contact are checked as they type; Next stays disabled until all pass.
+        const fields = [{ input: f.name, field: 'name' }, { input: f.cls, field: 'cls' }, { input: f.contact, field: 'contact' }];
+        const watch = watchEntries(fields, next);
+        if (st.rejected) { watch.reject(st.rejected.field, st.rejected.value); }
         f.addEventListener('submit', e => {
           e.preventDefault();
           const err = (t, el) => { root.querySelector('#pu-err').textContent = t; if (el) el.focus(); };
@@ -247,6 +402,7 @@
             if (!(a > 0) || a > 100000) return err('Please enter how much you want to offer.', f.amount);
             st.amount = a;
           }
+          if (!watch.valid()) { const bad = fields.find(x => x.input.getAttribute('aria-invalid')); if (bad) bad.input.focus(); return; }
           st.name = f.name.value.trim(); st.cls = f.cls.value.trim(); st.contact = f.contact.value.trim();
           if (st.name.length < 2) return err('Please enter your name.', f.name);
           write(KEYS.buyer, { name: st.name, cls: st.cls, contact: st.contact });
@@ -275,13 +431,23 @@
       if (window.AV && AV.onDataChange) AV.onDataChange();
     }
     function saveRemote(p) {
+      const fail = (r, text) => { const e = new Error((r && r.message) || text); e.code = r && r.error; e.field = r && r.field; throw e; };
       if (isVault) {
         // Needs supabase/migration_002.sql. Until it is run, the emailed copy still reaches the owner.
-        return AV.db.createVaultOffer(p).then(r => { if (!r || !r.ok) throw new Error((r && r.message) || 'Could not save offer'); });
+        return AV.db.createVaultOffer(p).then(r => { if (!r || !r.ok) fail(r, 'Could not save offer'); });
       }
-      return AV.db.createPickup(p).then(r => { if (!r || !r.ok) throw new Error((r && r.message) || 'Could not save pickup'); });
+      return AV.db.createPickup(p).then(r => { if (!r || !r.ok) fail(r, 'Could not save pickup'); });
+    }
+    // The database refused the name/class/contact (supabase/migration_003.sql): back to the form with "Invalid".
+    function backToDetails(e) {
+      const ee = entryError({ error: e.code, field: e.field });
+      st.done = false;
+      st.rejected = { field: ee.field, value: st[ee.field] };
+      st.i = STEPS.findIndex(s => s[0] === 'details' || s[0] === 'offer');
+      render();
     }
     async function submit() {
+      if (pickup) Object.assign(pickup, { name: st.name, cls: st.cls, contact: st.contact, meetup: st.meetup, time: st.time, price: st.amount, at: Date.now() });
       if (!pickup) {
         // One pickup per item (or vault) from this browser: a new/higher offer replaces the earlier one.
         const prev = !isFull ? getPickups().find(p => p.itemId === offer.itemId && p.type === offer.type && !p.collected) : null;
@@ -305,12 +471,13 @@
         const cachedItem = AV.db.cached(offer.itemId); if (cachedItem) { cachedItem.sold = true; cachedItem.status = 'sold'; }
         if (window.AV && AV.onDataChange) AV.onDataChange();
       }
-      upsertPickup(pickup);
       busy(isVault ? 'Sending your offer to the seller…' : 'Sending your pickup details to the seller…');
-      const [saved, mailed] = await Promise.allSettled([
-        job.saved ? Promise.resolve() : saveRemote(pickup),
-        job.emailed ? Promise.resolve() : sendPickupEmail(pickup)
-      ]);
+      // Save to the database first: if it rejects the name/class/contact, nothing is emailed and the buyer fixes it.
+      const [saved] = await Promise.allSettled([job.saved ? Promise.resolve() : saveRemote(pickup)]);
+      if (saved.status === 'rejected' && entryError({ error: saved.reason && saved.reason.code })) return backToDetails(saved.reason);
+      st.rejected = null;
+      upsertPickup(pickup);
+      const [mailed] = await Promise.allSettled([job.emailed ? Promise.resolve() : sendPickupEmail(pickup)]);
       if (saved.status === 'fulfilled') job.saved = true; else console.warn(isVault ? 'create_vault_offer failed' : 'create_pickup failed', saved.reason);
       if (mailed.status === 'fulfilled') job.emailed = true; else console.warn('FormSubmit email failed', mailed.reason);
       updatePickup(pickup.id, p => { p.emailStatus = job.emailed ? 'sent' : 'failed'; p.saved = job.saved; p.emailError = job.emailed ? '' : String(mailed.reason && mailed.reason.message || mailed.reason || ''); });
@@ -389,6 +556,7 @@
     KEYS, CATEGORIES, OWNER_PHONE, HOUR, getItems, getItem, myBid, setMyBid,
     salePrice, minNextBid, money, esc, timeLeft, thumbHTML,
     openModal, closeModal, toast, checkCode, read, write,
+    validateEntry, entryError, watchEntries, ENTRY_RULES,
     startPickup, getPickups, savePickups, updatePickup, sendPickupEmail, pickupPayload, typeLabel, CASH_LINE, MEETUP_POINTS, MEETUP_TIMES, PICKUP_ENDPOINT
   });
 })();

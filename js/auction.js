@@ -211,6 +211,8 @@
             <button class="btn" type="submit">Make offer</button>
           </form>
           <input id="bid-name" maxlength="60" placeholder="Your name (shown in offer history)" aria-label="Your name" value="${AV.esc(buyer.name || '')}" style="width:100%;margin-top:8px;padding:10px;border:1px solid #cfd2d6;border-radius:8px;font:inherit">
+          <span class="field-err" id="bid-name-err" aria-live="polite"></span>
+          <div class="muted" id="bid-name-hint" style="font-size:.8rem">Enter your name to make an offer.</div>
           <div class="muted" style="font-size:.8rem">Offer ${AV.money(min)} or more.</div>
           <p class="offer-note">💵 Highest offer wins. Pay cash at the meet-up — no cards.</p>
           <div class="msg" id="bid-msg" role="alert"></div>
@@ -228,6 +230,10 @@
     const form = body.querySelector('#bid-form');
     if (form) {
       if (focusBid) body.querySelector('#bid-amt').focus();
+      // Your name is checked as you type (no joke or rude names); "Make offer" stays disabled until it passes.
+      const nameInput = body.querySelector('#bid-name'), hint = body.querySelector('#bid-name-hint');
+      const watch = AV.watchEntries([{ input: nameInput, field: 'name', note: body.querySelector('#bid-name-err') }], form.querySelector('button'),
+        () => { hint.hidden = nameInput.value.trim() !== ''; });
       form.addEventListener('submit', async e => {
         e.preventDefault();
         const amt = Math.round(parseFloat(body.querySelector('#bid-amt').value) * 100) / 100;
@@ -236,6 +242,7 @@
         const err = t => { msg.className = 'msg err'; msg.textContent = t; };
         const cur = AV.getItem(id); const need = AV.minNextBid(cur);
         if (!(amt >= need)) return err(`Your offer must be at least ${AV.money(need)}.`);
+        if (!watch.valid()) { nameInput.focus(); return; }
         if (name.length < 2) { body.querySelector('#bid-name').focus(); return err('Please enter your name so the seller knows who made the offer.'); }
         if (cur.endsAt < Date.now() || cur.sold) return err('Sorry, this listing has closed.');
         btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Sending your offer…';
@@ -243,6 +250,8 @@
         try { r = await AV.db.placeBid(id, amt, name); }
         catch (ex) { btn.disabled = false; return err(AV.db.friendly(ex)); }
         btn.disabled = false;
+        const bad = AV.entryError(r);
+        if (bad) { msg.className = 'msg'; msg.textContent = ''; watch.reject('name', name); nameInput.focus(); return; }
         if (!r || !r.ok) {
           err(offerWords((r && r.message) || 'Your offer was not accepted.'));
           AV.db.loadItem(id).then(render).catch(() => {});

@@ -5,7 +5,8 @@
 -- seeds the 12 example auction items and the 4 storage vault tiers.
 -- Admin = the signed-in user whose email is h.bastian1@icloud.com.
 -- =====================================================================
--- After this, also run supabase/migration_002.sql (storage vault offers).
+-- After this, also run supabase/migration_002.sql (storage vault offers)
+-- and supabase/migration_003.sql (rejects joke / fake / rude buyer entries).
 
 create extension if not exists pgcrypto;  -- gen_random_uuid() (already on in Supabase)
 

@@ -34,6 +34,7 @@
   function friendly(e) {
     const m = String((e && e.message) || e || '');
     if (/not set up|database library/i.test(m)) return m;
+    if (/invalid_entry/i.test(m)) return 'Invalid — please enter your real name';
     if (/Failed to fetch|NetworkError|Load failed|abort|timed? ?out|network/i.test(m)) return "We couldn't reach the shop's server. Please check your internet connection and try again.";
     if (/JWT|permission|row-level|not authori[sz]ed|42501/i.test(m)) return 'You are not allowed to do that. Please sign in again.';
     return m || 'Something went wrong. Please try again.';
