@@ -59,7 +59,7 @@
     try { items = await db.admin.items(); renderRows(); } catch (e) { dashError(e); $('#rows').innerHTML = ''; }
   }
   async function loadTiers() {
-    try { tiers = await db.admin.tiers(); renderTiers(); } catch (e) { dashError(e); }
+    try { tiers = await db.admin.tiers(); renderTiers(); if (pickups.length) renderPickups(); } catch (e) { dashError(e); }
   }
   async function loadPickups() {
     try { pickups = await db.admin.pickups(); renderPickups(); } catch (e) { dashError(e); }
@@ -119,8 +119,8 @@
     };
     const bad = t => { msg.className = 'msg err'; msg.textContent = t; };
     if (!data.name) return bad('Please enter an item name.');
-    if (data.buy_now <= 0) return bad('Buy It Now price must be above $0.');
-    if (data.buy_now < data.starting_bid) return bad('Buy It Now price should be at least the starting bid.');
+    if (data.buy_now <= 0) return bad('Full price must be above $0.');
+    if (data.buy_now < data.starting_bid) return bad('Full price should be at least the starting offer.');
     if (data.image_url && !/^https?:\/\//i.test(data.image_url)) return bad('Image URL must start with http:// or https://');
     const days = Math.max(0.1, parseFloat(f.days.value) || 7);
     data.ends_at = new Date(Date.now() + days * DAY).toISOString();
@@ -196,16 +196,16 @@
   function renderPickups() {
     $('#pu-n').textContent = pickups.length;
     $('#pu-rows').innerHTML = pickups.map(p => {
-      const it = items.find(i => i.id === p.item_id);
+      const it = p.item_id ? items.find(i => i.id === p.item_id) : tiers.find(t => t.id === p.tier_id);
       return `<tr data-id="${AV.esc(p.id)}" class="${p.collected ? 'collected' : ''}">
         <td style="white-space:nowrap">${AV.esc(new Date(p.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }))}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.reference)}</span></td>
-        <td><span class="em-inline">${AV.esc((it && it.emoji) || '📦')}</span> <strong>${AV.esc(p.item_name)}</strong><br><span class="tag">${AV.esc(p.purchase_type)}</span></td>
-        <td><strong>${AV.money(p.price)}</strong><br><span class="muted" style="font-size:.75rem">💵 Cash</span></td>
+        <td><span class="em-inline">${AV.esc((it && it.emoji) || '📦')}</span> <strong>${AV.esc(p.item_name)}</strong><br><span class="tag">${AV.esc(AV.typeLabel(p.purchase_type))}</span></td>
+        <td><strong>${AV.money(p.price)}</strong><br><span class="muted" style="font-size:.75rem">💵 Cash at meet-up</span></td>
         <td><strong>${AV.esc(p.buyer_name)}</strong>${p.class ? `<br><span class="muted">${AV.esc(p.class)}</span>` : ''}${p.contact ? `<br><span class="muted">${AV.esc(p.contact)}</span>` : ''}</td>
         <td><strong>${AV.esc(p.meetup)}</strong><br>${AV.esc(p.time)}</td>
         <td style="white-space:nowrap"><button class="btn small ${p.collected ? 'grey' : 'outline'}" data-pu="collected">${p.collected ? '✓ Collected' : 'Mark collected'}</button> <button class="btn small danger" data-pu="del">Remove</button></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No pickups yet. They appear here when a buyer confirms a Buy It Now or bid and picks a meet-up.</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No pickups or offers yet. They appear here when a buyer makes an offer (auction or storage vault) and picks a meet-up.</td></tr>';
   }
   async function onPickupClick(e) {
     const b = e.target.closest('[data-pu]'); if (!b) return;

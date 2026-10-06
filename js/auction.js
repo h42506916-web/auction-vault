@@ -1,4 +1,5 @@
-/* Auction page: grid, search/filter, detail modal, bidding, Buy It Now — data shared via Supabase */
+/* Auction page: grid, search/filter, detail modal, offers (bids) and full-price offers — data shared via Supabase.
+   Highest offer wins; buyers pay cash at the meet-up, no cards. */
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -60,8 +61,8 @@
   function priceBlock(it) {
     const d = Number(it.discount) || 0;
     return d > 0
-      ? `<div class="bin">Buy It Now: <span class="strike">${AV.money(it.buyNow)}</span><span class="sale-price">${AV.money(AV.salePrice(it))}</span></div>`
-      : `<div class="bin">Buy It Now: <strong>${AV.money(it.buyNow)}</strong></div>`;
+      ? `<div class="bin">Full price: <span class="strike">${AV.money(it.buyNow)}</span><span class="sale-price">${AV.money(AV.salePrice(it))}</span></div>`
+      : `<div class="bin">Full price: <strong>${AV.money(it.buyNow)}</strong></div>`;
   }
   function badges(it) {
     let b = '';
@@ -70,6 +71,9 @@
     else if (it.source === 'seller') b += `<span class="badge new">NEW</span>`;
     return b;
   }
+  const offerLine = n => `${n ? 'Highest offer' : 'Starting offer'} · ${n} offer${n === 1 ? '' : 's'}`;
+  // Server messages say "bid"; show them in offer wording.
+  const offerWords = t => String(t || '').replace(/\bbids\b/g, 'offers').replace(/\bbid\b/g, 'offer').replace(/\bBid\b/g, 'Offer');
   const timerText = (it, tl, suffix) => it.sold ? 'Sold' : tl.ended ? 'Ended' : '⏱ ' + tl.text + (suffix || '');
 
   function render() {
@@ -85,14 +89,14 @@
         <div class="card-body">
           <div class="cat">${AV.esc(it.category)}</div>
           <div class="card-title">${AV.esc(it.name)}</div>
-          <div class="bid-line">${n ? 'Current bid' : 'Starting bid'} · ${n} bid${n === 1 ? '' : 's'}</div>
+          <div class="bid-line">${offerLine(n)}</div>
           <div class="bid-amt">${AV.money(n ? it.currentBid : it.startBid)}</div>
           ${priceBlock(it)}
           <div class="timer ${tl.ending && !closed ? 'ending' : ''}" data-ends="${it.endsAt}" ${it.sold ? 'data-sold="1"' : ''}>${timerText(it, tl)}</div>
         </div>
         <div class="card-actions">
-          <button class="btn" data-act="bid" ${closed ? 'disabled' : ''}>Bid</button>
-          <button class="btn outline" data-act="buy" ${closed ? 'disabled' : ''}>Buy It Now</button>
+          <button class="btn" data-act="bid" ${closed ? 'disabled' : ''}>Make an offer</button>
+          <button class="btn outline" data-act="buy" ${closed ? 'disabled' : ''}>Offer full price</button>
         </div>
       </article>`;
     }).join('');
@@ -106,7 +110,7 @@
       if (tl.ended) justEnded = true;
       el.textContent = tl.ended ? 'Ended' : '⏱ ' + tl.text; el.classList.toggle('ending', tl.ending);
     });
-    if (justEnded) render(); // disable Bid / Buy buttons on auctions that just ended (never relisted)
+    if (justEnded) render(); // disable offer buttons on auctions that just ended (never relisted)
     if (openId) { const t = document.querySelector('#av-modal .timer'); if (t && !t.dataset.sold) { const tl = AV.timeLeft(Number(t.dataset.ends)); t.textContent = tl.ended ? 'Ended' : '⏱ ' + tl.text + ' left'; } }
   }
 
@@ -117,8 +121,8 @@
     openDetail(id, act && act.dataset.act === 'bid');
   }
 
-  // Buy It Now: confirm the offer, then hand over to the cash-only pickup flow (no cart / card payment).
-  // The item is marked sold in the database (buy_now RPC) when the buyer confirms the last pickup step.
+  // "Offer full price" (buy_now in the database): confirm the offer, then hand over to the cash-only meet-up flow.
+  // The item is marked sold in the database (buy_now RPC) when the buyer confirms the last step.
   function buyNow(id) {
     const it = AV.getItem(id); if (!it || it.sold) return;
     const price = AV.salePrice(it);
@@ -126,9 +130,9 @@
         <div class="pu-item"><span class="pu-emoji" aria-hidden="true">${AV.esc(it.emoji || '📦')}</span>
           <div><div class="cat">${AV.esc(it.category)}</div><strong>${AV.esc(it.name)}</strong></div>
           <div class="pu-price">${AV.money(price)}</div></div>
-        <h2>Buy It Now?</h2>
-        <p>You're offering to buy <strong>${AV.esc(it.name)}</strong> for <strong>${AV.money(price)}</strong>${it.discount > 0 ? ` <span class="muted">(${Math.round(it.discount)}% off ${AV.money(it.buyNow)})</span>` : ''}.
-        Payment is <strong>cash only</strong>, at a school meet-up you'll choose next.</p>
+        <h2>Offer full price?</h2>
+        <p>You're offering <strong>${AV.money(price)}</strong> for <strong>${AV.esc(it.name)}</strong> — the full price${it.discount > 0 ? ` <span class="muted">(${Math.round(it.discount)}% off ${AV.money(it.buyNow)})</span>` : ''}. A full-price offer wins it straight away.</p>
+        <p>You'll pay <strong>${AV.money(price)}</strong> in cash at a school meet-up you choose next — no cards.</p>
         <div class="msg err" id="bin-msg" role="alert"></div>
         <div class="pu-nav"><button class="btn outline" type="button" data-cancel>Cancel</button><button class="btn" type="button" data-confirm>Confirm offer</button></div>
       </div>`);
@@ -153,7 +157,7 @@
   }
 
   function historyHTML(bids) {
-    return `<strong>Bid history</strong>${bids.length ? bids.map(b => `<div>${AV.money(b.amount)} — ${AV.esc(b.by)} · ${new Date(b.at).toLocaleString()}</div>`).join('') : '<div>No bids yet. Be the first!</div>'}`;
+    return `<strong>Offer history</strong>${bids.length ? bids.map(b => `<div>${AV.money(b.amount)} — ${AV.esc(b.by)} · ${new Date(b.at).toLocaleString()}</div>`).join('') : '<div>No offers yet. Be the first!</div>'}`;
   }
 
   function openDetail(id, focusBid) {
@@ -167,27 +171,28 @@
           <div class="cat">${AV.esc(it.category)}</div>
           <h2 style="letter-spacing:.06em">${AV.esc(it.name)}</h2>
           <p>${AV.esc(it.description || 'No description provided.')}</p>
-          <div class="bid-line">${n ? 'Current bid' : 'Starting bid'} · ${n} bid${n === 1 ? '' : 's'}</div>
+          <div class="bid-line">${offerLine(n)}</div>
           <div class="bid-amt" style="font-size:1.8rem">${AV.money(n ? it.currentBid : it.startBid)}</div>
           <div class="timer ${tl.ending && !closed ? 'ending' : ''}" data-ends="${it.endsAt}" ${it.sold ? 'data-sold="1"' : ''}>${timerText(it, tl, ' left')}</div>
           ${closed ? `<p class="msg err">${it.sold ? 'This item has been sold.' : 'This auction has ended.'}</p>` : `
           <form class="bid-form" id="bid-form">
-            <input type="number" id="bid-amt" min="${min}" step="0.01" value="${min}" aria-label="Your bid">
-            <button class="btn" type="submit">Place Bid</button>
+            <input type="number" id="bid-amt" min="${min}" step="0.01" value="${min}" aria-label="Your offer">
+            <button class="btn" type="submit">Make offer</button>
           </form>
-          <input id="bid-name" maxlength="60" placeholder="Your name (shown in bid history)" aria-label="Your name" value="${AV.esc(buyer.name || '')}" style="width:100%;margin-top:8px;padding:10px;border:1px solid #cfd2d6;border-radius:8px;font:inherit">
-          <div class="muted" style="font-size:.8rem">Enter ${AV.money(min)} or more.</div>
+          <input id="bid-name" maxlength="60" placeholder="Your name (shown in offer history)" aria-label="Your name" value="${AV.esc(buyer.name || '')}" style="width:100%;margin-top:8px;padding:10px;border:1px solid #cfd2d6;border-radius:8px;font:inherit">
+          <div class="muted" style="font-size:.8rem">Offer ${AV.money(min)} or more.</div>
+          <p class="offer-note">💵 Highest offer wins. Pay cash at the meet-up — no cards.</p>
           <div class="msg" id="bid-msg" role="alert"></div>
           <hr style="border:0;border-top:1px solid var(--grey-light);margin:14px 0">
           ${priceBlock(it)}
-          <button class="btn outline" id="bin" style="margin-top:8px;width:100%">Buy It Now for ${AV.money(AV.salePrice(it))}</button>`}
-          ${!closed && needsBidPickup(it) ? `<button class="btn grey" id="arrange" style="margin-top:8px;width:100%">Arrange cash pickup for your ${AV.money(it.currentBid)} bid</button>` : ''}
-          <div class="history" id="history"><strong>Bid history</strong><div>${n ? 'Loading…' : 'No bids yet. Be the first!'}</div></div>
+          <button class="btn outline" id="bin" style="margin-top:8px;width:100%">Offer full price — ${AV.money(AV.salePrice(it))}</button>`}
+          ${!closed && needsBidPickup(it) ? `<button class="btn grey" id="arrange" style="margin-top:8px;width:100%">Arrange cash pickup for your ${AV.money(it.currentBid)} offer</button>` : ''}
+          <div class="history" id="history"><strong>Offer history</strong><div>${n ? 'Loading…' : 'No offers yet. Be the first!'}</div></div>
         </div></div>`);
     openId = id;
     history.replaceState(null, '', '#' + encodeURIComponent(id));
     if (n) AV.db.itemBids(id).then(b => { const h = body.querySelector('#history'); if (h) h.innerHTML = historyHTML(b); })
-      .catch(() => { const h = body.querySelector('#history'); if (h) h.innerHTML = '<strong>Bid history</strong><div>Bid history is unavailable right now.</div>'; });
+      .catch(() => { const h = body.querySelector('#history'); if (h) h.innerHTML = '<strong>Offer history</strong><div>Offer history is unavailable right now.</div>'; });
     const form = body.querySelector('#bid-form');
     if (form) {
       if (focusBid) body.querySelector('#bid-amt').focus();
@@ -198,16 +203,16 @@
         const msg = body.querySelector('#bid-msg'); const btn = form.querySelector('button');
         const err = t => { msg.className = 'msg err'; msg.textContent = t; };
         const cur = AV.getItem(id); const need = AV.minNextBid(cur);
-        if (!(amt >= need)) return err(`Your bid must be at least ${AV.money(need)}.`);
-        if (name.length < 2) { body.querySelector('#bid-name').focus(); return err('Please enter your name so the seller knows who bid.'); }
+        if (!(amt >= need)) return err(`Your offer must be at least ${AV.money(need)}.`);
+        if (name.length < 2) { body.querySelector('#bid-name').focus(); return err('Please enter your name so the seller knows who made the offer.'); }
         if (cur.endsAt < Date.now() || cur.sold) return err('Sorry, this listing has closed.');
-        btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Placing your bid…';
+        btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Sending your offer…';
         let r;
         try { r = await AV.db.placeBid(id, amt, name); }
         catch (ex) { btn.disabled = false; return err(AV.db.friendly(ex)); }
         btn.disabled = false;
         if (!r || !r.ok) {
-          err((r && r.message) || 'Your bid was not accepted.');
+          err(offerWords((r && r.message) || 'Your offer was not accepted.'));
           AV.db.loadItem(id).then(render).catch(() => {});
           return;
         }
@@ -215,8 +220,8 @@
         AV.setMyBid(id, Number(r.current_bid));
         const saved = AV.read(AV.KEYS.buyer, {}) || {}; AV.write(AV.KEYS.buyer, Object.assign(saved, { name }));
         render();
-        // Bid accepted = offer confirmed → cash-only pickup flow.
-        arrangeBidPickup(cur, Number(r.current_bid), `✅ Bid of ${AV.money(r.current_bid)} placed — you're the highest bidder!`);
+        // Offer accepted → cash-only meet-up flow.
+        arrangeBidPickup(cur, Number(r.current_bid), `✅ Your ${AV.money(r.current_bid)} offer is in — it's the highest offer right now!`);
       });
       body.querySelector('#bin').addEventListener('click', () => buyNow(id));
     }

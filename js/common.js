@@ -1,8 +1,9 @@
-/* Auction Vault — shared helpers: header/footer, cart (local), modal, cash pickup flow, secret code.
-   Auction items, bids, pickups and storage tiers live in Supabase (see js/db.js). */
+/* Auction Vault — shared helpers: header/footer, modal, offer + cash meet-up flow, secret code.
+   Auction items, offers (bids), pickups and storage tiers live in Supabase (see js/db.js).
+   No cards or online payments anywhere: buyers make an offer, highest offer wins, cash at the meet-up. */
 (function () {
   'use strict';
-  const KEYS = { cart: 'av_cart_v1', orders: 'av_orders_v1', pickups: 'av_pickups_v1', buyer: 'av_buyer_v1', myBids: 'av_my_bids_v1' };
+  const KEYS = { pickups: 'av_pickups_v1', buyer: 'av_buyer_v1', myBids: 'av_my_bids_v1' };
   const SECRET_CODE = 'SCOUT TROOPER!'; // Only a shortcut to seller.html — the dashboard itself needs an email sign-in.
   const OWNER_PHONE = '455982359';
   const HOUR = 3600 * 1000;
@@ -50,20 +51,6 @@
     return `<div class="thumb">${extra || ''}<span aria-hidden="true">${esc(it.emoji || '📦')}</span>${img}</div>`;
   }
 
-  /* ---------- Cart ---------- */
-  function getCart() { return read(KEYS.cart, []); }
-  function saveCart(c) { write(KEYS.cart, c); updateCartCount(); }
-  function addToCart(entry) {
-    const cart = getCart();
-    if (entry.itemId && cart.some(c => c.itemId === entry.itemId)) { toast('Already in your cart'); openCart(); return; }
-    cart.push(Object.assign({ key: 'c' + Date.now() + Math.random().toString(36).slice(2, 6), qty: 1 }, entry));
-    saveCart(cart); toast('Added to cart: ' + entry.name); openCart();
-  }
-  function updateCartCount() {
-    const n = getCart().reduce((a, c) => a + (c.qty || 1), 0);
-    document.querySelectorAll('.cart-count').forEach(el => el.textContent = n);
-  }
-
   /* ---------- Modal + toast ---------- */
   function openModal(html, opts) {
     closeModal();
@@ -85,71 +72,8 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), 2600);
   }
 
-  function openCart() {
-    const cart = getCart();
-    // Auction items are never paid through checkout (cash-only meet-up). Any left over in an
-    // older cart get an "Arrange cash pickup" button instead.
-    const shop = cart.filter(c => !c.itemId); const auction = cart.filter(c => c.itemId);
-    const total = shop.reduce((a, c) => a + c.price * (c.qty || 1), 0);
-    const body = openModal(`
-      <h2>Your Cart</h2>
-      ${cart.length ? `<ul class="cart-list">${shop.map(c => `
-        <li><span>${esc(c.emoji || '📦')} <strong>${esc(c.name)}</strong><br><small class="muted">${esc(c.kind || '')}</small></span>
-        <span><strong>${money(c.price)}</strong> <button class="btn small outline" data-remove="${esc(c.key)}">Remove</button></span></li>`).join('')}
-        ${auction.map(c => `
-        <li><span>${esc(c.emoji || '📦')} <strong>${esc(c.name)}</strong><br><small class="muted">Auction item — cash only at meet-up</small></span>
-        <span><strong>${money(c.price)}</strong> <button class="btn small" data-pickup="${esc(c.key)}">Arrange cash pickup</button> <button class="btn small outline" data-remove="${esc(c.key)}">Remove</button></span></li>`).join('')}</ul>
-        ${shop.length ? `<div class="cart-total">Total: ${money(total)}</div>
-        <button class="btn" id="go-checkout" style="width:100%">Proceed to Checkout</button>` : ''}`
-        : '<p class="muted">Your cart is empty.</p><a class="btn outline" href="storage.html">Browse Vaults</a> <a class="btn outline" href="auction.html">Browse Auction</a>'}
-    `);
-    body.querySelectorAll('[data-remove]').forEach(b => b.addEventListener('click', () => {
-      saveCart(getCart().filter(c => c.key !== b.dataset.remove)); openCart();
-    }));
-    body.querySelectorAll('[data-pickup]').forEach(b => b.addEventListener('click', () => {
-      const c = getCart().find(x => x.key === b.dataset.pickup); if (!c) return openCart();
-      saveCart(getCart().filter(x => x.key !== c.key));
-      b.disabled = true;
-      AV.db.loadItem(c.itemId).then(it => {
-        if (!it || it.sold || it.endsAt < Date.now()) { toast('Sorry, that item is no longer available'); return openCart(); }
-        startPickup({ itemId: it.id, item: it.name, emoji: it.emoji, price: salePrice(it), type: 'Buy It Now' });
-      }).catch(e => { toast(AV.db.friendly(e)); saveCart(getCart().concat([c])); openCart(); });
-    }));
-    const go = body.querySelector('#go-checkout');
-    if (go) go.addEventListener('click', openCheckout);
-  }
-
-  // Storage-vault checkout (unchanged payment options). Auction items are excluded — they use startPickup().
-  function openCheckout() {
-    const cart = getCart().filter(c => !c.itemId); if (!cart.length) return openCart();
-    const total = cart.reduce((a, c) => a + c.price * (c.qty || 1), 0);
-    const body = openModal(`
-      <h2>Checkout</h2>
-      <p class="muted">This is a demo checkout — no payment is taken and no card details are stored.</p>
-      <form class="stack" id="checkout-form">
-        <div class="row2"><label>Full name<input name="name" required autocomplete="name"></label>
-        <label>Email<input name="email" type="email" required autocomplete="email"></label></div>
-        <label>Payment method<select name="pay"><option>Credit / Debit Card</option><option>PayPal</option><option>Bank Transfer</option><option>Pay at counter</option></select></label>
-        <div class="cart-total">Order total: ${money(total)}</div>
-        <button class="btn" type="submit">Place Order (Demo)</button>
-      </form>`);
-    body.querySelector('#checkout-form').addEventListener('submit', e => {
-      e.preventDefault();
-      const f = new FormData(e.target);
-      const orderNo = 'AV-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-      const orders = read(KEYS.orders, []);
-      orders.push({ orderNo, name: f.get('name'), email: f.get('email'), pay: f.get('pay'), items: cart, total, at: Date.now() });
-      write(KEYS.orders, orders);
-      saveCart(getCart().filter(c => c.itemId)); // keep any auction items (they need a cash pickup instead)
-      openModal(`<div class="success-box"><div class="tick">✅</div><h2>Order Confirmed</h2>
-        <p>Thanks, ${esc(f.get('name'))}! Your order number is <strong>${orderNo}</strong>.</p>
-        <p class="muted">Total ${money(total)} via ${esc(f.get('pay'))}. (Demo only — no payment was processed.)</p>
-        <button class="btn" onclick="AV.closeModal()">Done</button></div>`);
-      if (window.AV && AV.onDataChange) AV.onDataChange();
-    });
-  }
-
-  /* ---------- Auction pickup: cash-only meet-up, emailed to the owner via FormSubmit ---------- */
+  /* ---------- Offer + cash-only meet-up, emailed to the owner via FormSubmit ----------
+     Used for auction offers, full-price offers and storage vault offers. No cards, ever. */
   const PICKUP_ENDPOINT = 'https://formsubmit.co/ajax/h.bastian1@icloud.com';
   const MEETUP_POINTS = [
     { v: 'Languages Building', icon: '🗣️' },
@@ -160,7 +84,10 @@
     { v: 'Lunch', icon: '🥪' },
     { v: 'Recess', icon: '🍎' }
   ];
-  const STEP_NAMES = ['Cash only', 'Your details', 'Meet-up point', 'Time', 'Confirm'];
+  // purchase_type values stored in the database → wording shown to people
+  const TYPE_LABELS = { 'Buy It Now': 'Full-price offer', 'Highest bid': 'Highest offer', 'Vault offer': 'Vault offer' };
+  const typeLabel = t => TYPE_LABELS[t] || t;
+  const CASH_LINE = 'Highest offer wins. Pay cash at the meet-up — no cards.';
 
   function getPickups() { const p = read(KEYS.pickups, []); return Array.isArray(p) ? p : []; }
   function savePickups(list) { write(KEYS.pickups, list); }
@@ -175,22 +102,27 @@
   }
 
   function pickupPayload(p) {
-    return {
-      _subject: 'New Auction Vault pickup: ' + p.item,
+    const vault = p.type === 'Vault offer';
+    const out = {
+      _subject: (vault ? 'New Auction Vault offer: ' : 'New Auction Vault pickup: ') + p.item + ' — ' + money(p.price) + ' cash',
       _template: 'table',
       _captcha: 'false',
       name: p.name,
       class: p.cls || '—',
       contact: p.contact || '—',
       item: p.item,
+      offer: money(p.price),
       price: money(p.price),
       purchase_type: p.type,
-      payment: 'Cash',
+      offer_type: typeLabel(p.type),
+      payment: 'Cash at meet-up (no cards)',
       meetup: p.meetup,
       time: p.time,
       reference: p.id,
       submitted_at: new Date(p.at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })
     };
+    if (vault && p.listPrice != null) out.listed_price = money(p.listPrice);
+    return out;
   }
   function sendPickupEmail(p) {
     return fetch(PICKUP_ENDPOINT, {
@@ -203,93 +135,135 @@
     }));
   }
 
-  // offer: { itemId, item, emoji, price, type: 'Buy It Now' | 'Highest bid', banner? }
+  // offer: { itemId, item, emoji, price, type: 'Buy It Now' | 'Highest bid' | 'Vault offer', banner?, listPrice? }
+  //  - 'Highest bid': the buyer's accepted auction offer (price = their offer)
+  //  - 'Buy It Now':  an offer at the full listed price (shown as "Offer full price")
+  //  - 'Vault offer': a storage vault offer; the buyer types the amount (listPrice is the guide)
   function startPickup(offer) {
     const saved = read(KEYS.buyer, {}) || {};
-    const st = { step: 1, name: saved.name || '', cls: saved.cls || '', contact: saved.contact || '', meetup: '', time: '', done: false };
+    const isVault = offer.type === 'Vault offer';
+    const isBid = offer.type === 'Highest bid';
+    const isFull = offer.type === 'Buy It Now';
+    const prevVault = isVault ? getPickups().find(p => p.itemId === offer.itemId && p.type === 'Vault offer' && !p.collected) : null;
+    const st = { i: 0, name: saved.name || '', cls: saved.cls || '', contact: saved.contact || '', meetup: '', time: '',
+      amount: isVault ? (prevVault ? Number(prevVault.price) : null) : Number(offer.price), done: false };
+    const STEPS = isVault
+      ? [['offer', 'Your offer'], ['meetup', 'Meet-up point'], ['time', 'Time'], ['confirm', 'Reminder']]
+      : [['cash', 'Cash only'], ['details', 'Your details'], ['meetup', 'Meet-up point'], ['time', 'Time'], ['confirm', 'Confirm']];
+    const key = () => STEPS[st.i][0];
+    const isForm = () => key() === 'details' || key() === 'offer';
     const body = openModal('<div class="pickup" id="pickup"></div>');
     const root = body.querySelector('#pickup');
-    const isBid = offer.type !== 'Buy It Now';
+    const amt = () => money(st.amount);
 
     const head = () => `
-      ${offer.banner && st.step === 1 ? `<div class="msg ok pu-banner">${esc(offer.banner)}</div>` : ''}
+      ${offer.banner && st.i === 0 ? `<div class="msg ok pu-banner">${esc(offer.banner)}</div>` : ''}
       <div class="pu-item"><span class="pu-emoji" aria-hidden="true">${esc(offer.emoji || '📦')}</span>
-        <div><div class="cat">${isBid ? 'Your winning offer' : 'Buy It Now — offer confirmed'}</div>
-        <strong>${esc(offer.item)}</strong></div><div class="pu-price">${money(offer.price)}</div></div>
-      <ol class="pu-steps" aria-label="Progress">${STEP_NAMES.map((n, i) => `<li class="${i + 1 < st.step ? 'done' : i + 1 === st.step ? 'current' : ''}"><span>${i + 1}</span><em>${n}</em></li>`).join('')}</ol>
-      <div class="pu-stepno">Step ${st.step} of 5</div>`;
+        <div><div class="cat">${isVault ? 'Storage vault — make an offer' : isBid ? 'Your offer' : 'Offer full price'}</div>
+        <strong>${esc(offer.item)}</strong></div>
+        <div class="pu-price">${isVault ? (st.amount ? amt() : `<small class="muted">Guide ${money(offer.listPrice)}</small>`) : amt()}</div></div>
+      <ol class="pu-steps" aria-label="Progress">${STEPS.map((n, i) => `<li class="${i < st.i ? 'done' : i === st.i ? 'current' : ''}"><span>${i + 1}</span><em>${n[1]}</em></li>`).join('')}</ol>
+      <div class="pu-stepno">Step ${st.i + 1} of ${STEPS.length}</div>`;
     const nav = (nextLabel, nextDisabled) => `<div class="pu-nav">
-      ${st.step > 1 ? '<button type="button" class="btn outline" data-nav="back">← Back</button>' : '<span></span>'}
-      <button type="${st.step === 2 ? 'submit' : 'button'}" class="btn" data-nav="next" ${nextDisabled ? 'disabled' : ''}>${nextLabel}</button></div>`;
+      ${st.i > 0 ? '<button type="button" class="btn outline" data-nav="back">← Back</button>' : '<span></span>'}
+      <button type="${isForm() ? 'submit' : 'button'}" class="btn" data-nav="next" ${nextDisabled ? 'disabled' : ''}>${nextLabel}</button></div>`;
     const options = (list, cur, field) => `<div class="pu-options" role="radiogroup">${list.map(o => `
       <button type="button" class="pu-option ${cur === o.v ? 'selected' : ''}" role="radio" aria-checked="${cur === o.v}" data-${field}="${esc(o.v)}">
         <span class="pu-ico" aria-hidden="true">${o.icon}</span><span>${esc(o.v)}</span></button>`).join('')}</div>`;
+    const detailFields = () => `
+      <label>Your name<input name="name" required maxlength="60" autocomplete="name" value="${esc(st.name)}"></label>
+      <div class="row2"><label>Class (optional)<input name="cls" maxlength="30" placeholder="e.g. 8B" value="${esc(st.cls)}"></label>
+      <label>Contact (optional)<input name="contact" maxlength="80" placeholder="Phone or email" value="${esc(st.contact)}"></label></div>`;
+    const reminder = () => {
+      const lead = isBid ? `You're offering <strong>${amt()}</strong> — the highest offer right now.`
+        : isFull ? `You're offering <strong>${amt()}</strong> — the full price.`
+        : `You're offering <strong>${amt()}</strong>.`;
+      return `<div class="cash-box offer-reminder" id="pu-reminder"><div class="cash-ico" aria-hidden="true">💵</div><div>
+        <strong>${lead} Highest offer wins.</strong>
+        <p>You'll pay <strong>${amt()}</strong> in cash at the meet-up — no cards.</p></div></div>`;
+    };
 
     function render() {
       let html = '';
-      if (st.step === 1) {
-        html = `<h2>Payment: cash only</h2>
+      const k = key();
+      if (k === 'cash') {
+        html = `<h2>Cash only — no cards</h2>
           <div class="cash-box"><div class="cash-ico" aria-hidden="true">💵</div><div>
-            <strong>Payment is CASH ONLY, paid at the meet-up.</strong>
-            <p>Bring <strong>${money(offer.price)}</strong> in cash when you collect the item. No cards, bank transfers or online payments.</p></div></div>
-          <p class="muted pu-note">${isBid ? 'Your bid stands either way — you can also arrange pickup later from the item page.' : 'Closing this window before the last step cancels the purchase.'}</p>
+            <strong>${isBid ? `Your offer: ${amt()}. Highest offer wins.` : `Your offer: ${amt()} (full price).`}</strong>
+            <p>You'll pay <strong>${amt()}</strong> in cash when you collect the item at the meet-up. No cards, bank transfers or online payments.</p></div></div>
+          <p class="muted pu-note">${isBid ? 'Your offer stands either way — you can also arrange pickup later from the item page.' : 'Closing this window before the last step cancels your offer.'}</p>
           ${nav('Got it — next →')}`;
-      } else if (st.step === 2) {
+      } else if (k === 'details') {
         html = `<h2>Who are you?</h2><p class="muted">So the seller knows who to look for.</p>
           <form class="stack" id="pu-form" novalidate>
-            <label>Your name<input name="name" required maxlength="60" autocomplete="name" value="${esc(st.name)}"></label>
-            <div class="row2"><label>Class (optional)<input name="cls" maxlength="30" placeholder="e.g. 8B" value="${esc(st.cls)}"></label>
-            <label>Contact (optional)<input name="contact" maxlength="80" placeholder="Phone or email" value="${esc(st.contact)}"></label></div>
+            ${detailFields()}
             <div class="msg err" id="pu-err" role="alert"></div>
             ${nav('Next →')}
           </form>`;
-      } else if (st.step === 3) {
-        html = `<h2>Choose a meet-up point</h2><p class="muted">Where should you meet the seller?</p>
+      } else if (k === 'offer') {
+        html = `<h2>Make an offer</h2>
+          <p class="muted">${esc(CASH_LINE)}</p>
+          <form class="stack" id="pu-form" novalidate>
+            <label>Your offer ($)<input name="amount" type="number" inputmode="decimal" min="1" step="0.01" required value="${st.amount ? esc(st.amount) : ''}" placeholder="e.g. ${esc(Number(offer.listPrice) || '')}"></label>
+            <div class="muted pu-guide" style="font-size:.85rem">Guide price: <strong>${money(offer.listPrice)}</strong>. Offer what you like — the highest offer wins.</div>
+            ${detailFields()}
+            <div class="msg err" id="pu-err" role="alert"></div>
+            ${nav('Next →')}
+          </form>`;
+      } else if (k === 'meetup') {
+        html = `<h2>Choose a meet-up point</h2><p class="muted">Where should you meet the seller and pay in cash?</p>
           ${options(MEETUP_POINTS, st.meetup, 'meetup')}${nav('Next →', !st.meetup)}`;
-      } else if (st.step === 4) {
+      } else if (k === 'time') {
         html = `<h2>Lunch or recess?</h2><p class="muted">When will you meet at <strong>${esc(st.meetup)}</strong>?</p>
           ${options(MEETUP_TIMES, st.time, 'time')}${nav('Next →', !st.time)}`;
-      } else if (st.step === 5) {
-        html = `<h2>Confirm your pickup</h2>
+      } else if (k === 'confirm') {
+        html = `<h2>${isVault ? 'Check your offer' : 'Confirm your offer'}</h2>
+          ${reminder()}
           <table class="pu-summary">
-            <tr><th>Item</th><td>${esc(offer.item)}</td></tr>
-            <tr><th>Price</th><td><strong>${money(offer.price)}</strong>${isBid ? ' <span class="muted">(your bid)</span>' : ''}</td></tr>
-            <tr><th>Payment</th><td>💵 Cash — paid at the meet-up</td></tr>
+            <tr><th>${isVault ? 'Vault' : 'Item'}</th><td>${esc(offer.item)}</td></tr>
+            <tr><th>Your offer</th><td><strong>${amt()}</strong>${isVault ? ` <span class="muted">(guide ${money(offer.listPrice)})</span>` : isFull ? ' <span class="muted">(full price)</span>' : ''}</td></tr>
+            <tr><th>Payment</th><td>💵 Cash at the meet-up — no cards</td></tr>
             <tr><th>Meet-up point</th><td>${esc(st.meetup)}</td></tr>
             <tr><th>Time</th><td>${esc(st.time)}</td></tr>
             <tr><th>Your name</th><td>${esc(st.name)}${st.cls ? ' · ' + esc(st.cls) : ''}${st.contact ? '<br><span class="muted">' + esc(st.contact) + '</span>' : ''}</td></tr>
           </table>
           <div class="msg err" id="pu-err" role="alert"></div>
-          ${nav('Confirm &amp; notify seller')}`;
+          ${nav(isVault ? 'Send my offer' : 'Confirm &amp; notify seller')}`;
       }
       root.innerHTML = head() + html;
       bind();
     }
 
     function bind() {
-      root.querySelectorAll('[data-nav="back"]').forEach(b => b.addEventListener('click', () => { st.step--; render(); }));
+      root.querySelectorAll('[data-nav="back"]').forEach(b => b.addEventListener('click', () => { st.i--; render(); }));
       const next = root.querySelector('[data-nav="next"]');
-      if (st.step === 2) {
+      if (isForm()) {
         const f = root.querySelector('#pu-form');
         f.addEventListener('submit', e => {
           e.preventDefault();
+          const err = (t, el) => { root.querySelector('#pu-err').textContent = t; if (el) el.focus(); };
+          if (f.amount) {
+            const a = Math.round(parseFloat(f.amount.value) * 100) / 100;
+            if (!(a > 0) || a > 100000) return err('Please enter how much you want to offer.', f.amount);
+            st.amount = a;
+          }
           st.name = f.name.value.trim(); st.cls = f.cls.value.trim(); st.contact = f.contact.value.trim();
-          if (st.name.length < 2) { root.querySelector('#pu-err').textContent = 'Please enter your name.'; f.name.focus(); return; }
+          if (st.name.length < 2) return err('Please enter your name.', f.name);
           write(KEYS.buyer, { name: st.name, cls: st.cls, contact: st.contact });
-          st.step = 3; render();
+          st.i++; render();
         });
-        setTimeout(() => { if (f.name) f.name.focus(); }, 0);
+        setTimeout(() => { const first = f.amount || f.name; if (first) first.focus(); }, 0);
         return;
       }
       root.querySelectorAll('[data-meetup]').forEach(b => b.addEventListener('click', () => { st.meetup = b.dataset.meetup; render(); }));
       root.querySelectorAll('[data-time]').forEach(b => b.addEventListener('click', () => { st.time = b.dataset.time; render(); }));
       if (!next) return;
-      if (st.step === 5) next.addEventListener('click', submit);
-      else next.addEventListener('click', () => { if (!next.disabled) { st.step++; render(); } });
+      if (key() === 'confirm') next.addEventListener('click', submit);
+      else next.addEventListener('click', () => { if (!next.disabled) { st.i++; render(); } });
     }
 
     // job tracks which parts already succeeded, so "Try again" only redoes the failed ones
-    let pickup = null; const job = { sold: isBid, saved: false, emailed: false };
+    let pickup = null; const job = { sold: !isFull, saved: false, emailed: false };
     const busy = text => { root.innerHTML = `<div class="success-box pu-sending"><div class="spinner" aria-hidden="true"></div><h3>${esc(text)}</h3></div>`; };
     function failScreen(title, text, retry) {
       root.innerHTML = `<div class="success-box pu-result err"><div class="tick">⚠️</div><h2>${esc(title)}</h2>
@@ -300,48 +274,58 @@
       if (retry) root.querySelector('[data-retry]').addEventListener('click', submit);
       if (window.AV && AV.onDataChange) AV.onDataChange();
     }
+    function saveRemote(p) {
+      if (isVault) {
+        // Needs supabase/migration_002.sql. Until it is run, the emailed copy still reaches the owner.
+        return AV.db.createVaultOffer(p).then(r => { if (!r || !r.ok) throw new Error((r && r.message) || 'Could not save offer'); });
+      }
+      return AV.db.createPickup(p).then(r => { if (!r || !r.ok) throw new Error((r && r.message) || 'Could not save pickup'); });
+    }
     async function submit() {
       if (!pickup) {
-        // One pickup per item for bids from this browser: a higher bid replaces the earlier pickup.
-        const prev = isBid ? getPickups().find(p => p.itemId === offer.itemId && p.type === offer.type && !p.collected) : null;
+        // One pickup per item (or vault) from this browser: a new/higher offer replaces the earlier one.
+        const prev = !isFull ? getPickups().find(p => p.itemId === offer.itemId && p.type === offer.type && !p.collected) : null;
+        const prefix = isVault ? 'VO-' : 'PU-';
         pickup = {
-          id: prev ? prev.id : 'PU-' + Date.now().toString(36).toUpperCase().slice(-5) + Math.random().toString(36).slice(2, 5).toUpperCase(),
-          itemId: offer.itemId, item: offer.item, emoji: offer.emoji || '📦', price: offer.price, type: offer.type,
+          id: prev ? prev.id : prefix + Date.now().toString(36).toUpperCase().slice(-5) + Math.random().toString(36).slice(2, 5).toUpperCase(),
+          itemId: offer.itemId, item: offer.item, emoji: offer.emoji || '📦', price: st.amount, type: offer.type,
+          listPrice: isVault ? Number(offer.listPrice) : undefined,
           name: st.name, cls: st.cls, contact: st.contact, payment: 'Cash', meetup: st.meetup, time: st.time,
           at: Date.now(), emailStatus: 'sending', collected: false
         };
       }
       st.done = true;
-      if (!job.sold) { // Buy It Now: claim the item in the shared database first
-        busy('Confirming your purchase…');
+      if (!job.sold) { // Full-price offer: claim the item in the shared database first
+        busy('Confirming your offer…');
         let r;
-        try { r = await AV.db.buyNow(offer.itemId); } catch (e) { return failScreen("Couldn't confirm your purchase", esc(AV.db.friendly(e)), true); }
+        try { r = await AV.db.buyNow(offer.itemId); } catch (e) { return failScreen("Couldn't confirm your offer", esc(AV.db.friendly(e)), true); }
         if (!r || !r.ok) { st.done = false; return failScreen('Sorry — this item is no longer available', esc((r && r.message) || 'It may have just been sold.'), false); }
         job.sold = true;
-        if (r.price != null) pickup.price = Number(r.price);
+        if (r.price != null) pickup.price = st.amount = Number(r.price);
         const cachedItem = AV.db.cached(offer.itemId); if (cachedItem) { cachedItem.sold = true; cachedItem.status = 'sold'; }
-        saveCart(getCart().filter(c => c.itemId !== offer.itemId));
         if (window.AV && AV.onDataChange) AV.onDataChange();
       }
       upsertPickup(pickup);
-      busy('Sending your pickup details to the seller…');
+      busy(isVault ? 'Sending your offer to the seller…' : 'Sending your pickup details to the seller…');
       const [saved, mailed] = await Promise.allSettled([
-        job.saved ? Promise.resolve() : AV.db.createPickup(pickup).then(r => { if (!r || !r.ok) throw new Error((r && r.message) || 'Could not save pickup'); }),
+        job.saved ? Promise.resolve() : saveRemote(pickup),
         job.emailed ? Promise.resolve() : sendPickupEmail(pickup)
       ]);
-      if (saved.status === 'fulfilled') job.saved = true; else console.warn('create_pickup failed', saved.reason);
+      if (saved.status === 'fulfilled') job.saved = true; else console.warn(isVault ? 'create_vault_offer failed' : 'create_pickup failed', saved.reason);
       if (mailed.status === 'fulfilled') job.emailed = true; else console.warn('FormSubmit email failed', mailed.reason);
       updatePickup(pickup.id, p => { p.emailStatus = job.emailed ? 'sent' : 'failed'; p.saved = job.saved; p.emailError = job.emailed ? '' : String(mailed.reason && mailed.reason.message || mailed.reason || ''); });
       if (job.saved || job.emailed) {
-        root.innerHTML = `<div class="success-box pu-result ok"><div class="tick">✅</div><h2>You're all set!</h2>
-          <p>${job.emailed ? 'The seller has been emailed your pickup details.' : 'Your pickup has been sent to the seller\'s dashboard.'}</p>
-          <p class="pu-recap">Meet at <strong>${esc(pickup.meetup)}</strong> at <strong>${esc(pickup.time.toLowerCase())}</strong> and bring <strong>${money(pickup.price)} cash</strong>.</p>
+        const when = `<strong>${esc(pickup.meetup)}</strong> at <strong>${esc(pickup.time.toLowerCase())}</strong>`;
+        root.innerHTML = `<div class="success-box pu-result ok"><div class="tick">✅</div><h2>${isVault ? 'Offer sent!' : "You're all set!"}</h2>
+          <p class="pu-recap"><strong>You offered ${money(pickup.price)}.</strong> Highest offer wins.</p>
+          <p>${job.emailed ? 'The seller has been emailed your details.' : 'Your details have been sent to the seller\'s dashboard.'}${isVault ? ' The owner will confirm with you if yours is the highest offer.' : ''}</p>
+          <p class="pu-recap">${isVault ? 'Then meet' : 'Meet'} at ${when} and bring <strong>${money(pickup.price)} in cash</strong> — no cards.</p>
           <p class="muted">Reference ${esc(pickup.id)}</p>
           <button class="btn" type="button" data-done>Done</button></div>`;
         root.querySelector('[data-done]').addEventListener('click', closeModal);
         if (window.AV && AV.onDataChange) AV.onDataChange();
       } else {
-        failScreen("Couldn't reach the seller", `Your ${isBid ? 'bid stands' : 'purchase is confirmed'}, but we couldn't send your pickup details just now. Please check your internet connection and try again.`, true);
+        failScreen("Couldn't reach the seller", `Your ${isBid ? 'offer stands' : isFull ? 'offer is confirmed' : 'offer is not sent yet'}, but we couldn't send your details just now. Please check your internet connection and try again.`, true);
       }
     }
 
@@ -379,10 +363,9 @@
         <a class="brand" href="index.html"><img src="assets/logo-mark.png" alt="Auction Vault logo"><span>Auction Vault</span></a>
         <button class="menu-toggle" aria-label="Menu">☰</button>
         <nav class="tabs" aria-label="Main">${tabs.map(t => `<a href="${t[1]}" class="${t[0] === page ? 'active' : ''}">${t[2]}</a>`).join('')}</nav>
-        <div class="header-tools">${codeFormHTML}<button class="cart-btn" type="button">🛒 Cart<span class="cart-count">0</span></button></div>
+        <div class="header-tools">${codeFormHTML}</div>
       </div>`;
       header.querySelector('.menu-toggle').addEventListener('click', () => header.querySelector('.tabs').classList.toggle('open'));
-      header.querySelector('.cart-btn').addEventListener('click', openCart);
       bindCodeForm(header.querySelector('.code-form'));
     }
     const footer = document.getElementById('site-footer');
@@ -392,19 +375,20 @@
         <div><div class="brand">Auction Vault</div><div>Mystery vaults &amp; online auctions.</div></div>
         <div>Need help? Call the owner on <a href="tel:${OWNER_PHONE}">${OWNER_PHONE}</a><br><a href="support.html">Customer Service</a></div>
         <div>${codeFormHTML}</div>
-      </div><div class="container" style="margin-top:16px;font-size:.75rem;color:#8A8D91">© ${new Date().getFullYear()} Auction Vault. Demo site — no real payments are processed.</div>`;
+      </div><div class="container" style="margin-top:16px;font-size:.75rem;color:#8A8D91">© ${new Date().getFullYear()} Auction Vault. Cash only at the meet-up. No card payments — make an offer, highest offer wins.</div>`;
       bindCodeForm(footer.querySelector('.code-form'));
     }
-    updateCartCount();
   }
 
-  window.addEventListener('storage', () => { updateCartCount(); if (window.AV && AV.onDataChange) AV.onDataChange(); });
+  window.addEventListener('storage', () => { if (window.AV && AV.onDataChange) AV.onDataChange(); });
+  // The old storage-vault cart is gone (vaults now go through offers); tidy up its leftover data.
+  try { localStorage.removeItem('av_cart_v1'); localStorage.removeItem('av_orders_v1'); } catch (e) {}
   document.addEventListener('DOMContentLoaded', renderChrome);
 
   window.AV = Object.assign(window.AV || {}, {
     KEYS, CATEGORIES, OWNER_PHONE, HOUR, getItems, getItem, myBid, setMyBid,
-    salePrice, minNextBid, money, esc, timeLeft, thumbHTML, getCart, addToCart, openCart, openCheckout,
+    salePrice, minNextBid, money, esc, timeLeft, thumbHTML,
     openModal, closeModal, toast, checkCode, read, write,
-    startPickup, getPickups, savePickups, updatePickup, sendPickupEmail, pickupPayload, MEETUP_POINTS, MEETUP_TIMES, PICKUP_ENDPOINT
+    startPickup, getPickups, savePickups, updatePickup, sendPickupEmail, pickupPayload, typeLabel, CASH_LINE, MEETUP_POINTS, MEETUP_TIMES, PICKUP_ENDPOINT
   });
 })();

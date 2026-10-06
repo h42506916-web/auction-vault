@@ -1,4 +1,5 @@
-/* Storage Units page: tiers come from Supabase (storage_tiers); checkout uses the local cart. */
+/* Storage Units page: tiers come from Supabase (storage_tiers). Buyers make an offer (the listed price is a
+   guide), highest offer wins, and they pay cash at a school meet-up — no cards, no checkout. */
 (function () {
   'use strict';
   let tiers = [];
@@ -13,8 +14,9 @@
           <div class="vault-art">${AV.esc(t.emoji)}</div>
           <h3>${AV.esc(t.name)}</h3>
           <div class="price">${AV.money(t.price)}</div>
+          <div class="muted price-note" style="font-size:.75rem;margin-top:-4px">Guide price</div>
           <ul>${t.perks.map(p => '<li>' + AV.esc(p) + '</li>').join('')}</ul>
-          <button class="btn" data-id="${AV.esc(t.id)}">Buy Now</button>
+          <button class="btn" data-id="${AV.esc(t.id)}">Make an offer</button>
         </div>`).join('') || '<div class="empty">No vaults are available right now. Check back soon!</div>';
     } catch (e) {
       console.error(e);
@@ -26,7 +28,7 @@
     document.getElementById('tiers').addEventListener('click', e => {
       const b = e.target.closest('[data-id]'); if (!b) return;
       const t = tiers.find(x => x.id === b.dataset.id); if (!t) return;
-      AV.addToCart({ name: t.name, price: t.price, emoji: t.emoji, kind: 'Mystery Storage Vault' });
+      AV.startPickup({ itemId: t.id, item: t.name, emoji: t.emoji, listPrice: t.price, type: 'Vault offer' });
     });
     load();
   });

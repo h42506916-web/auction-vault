@@ -87,6 +87,13 @@
         p_buyer_name: p.name, p_class: p.cls || '', p_contact: p.contact || '', p_meetup: p.meetup, p_time: p.time, p_reference: p.id
       }));
     },
+    // Storage vault offer (RPC added by supabase/migration_002.sql)
+    async createVaultOffer(p) {
+      return check(await sb().rpc('create_vault_offer', {
+        p_tier_id: p.itemId, p_amount: p.price, p_buyer_name: p.name, p_class: p.cls || '', p_contact: p.contact || '',
+        p_meetup: p.meetup, p_time: p.time, p_reference: p.id
+      }));
+    },
 
     /* ----- auth (seller) ----- */
     adminEmail: cfg.adminEmail || '',
