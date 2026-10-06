@@ -60,6 +60,28 @@ h3{font-size:1.05rem;letter-spacing:.08em}
 .choice .icon{font-size:3rem}
 .choice h2{margin:.4em 0 .3em}
 .choice .go{margin-top:14px;font-family:var(--head);font-weight:800;color:var(--navy);letter-spacing:.12em;text-transform:uppercase;font-size:.85rem}
+/* Home: Auction + Vault on top, Profile centred below = triangle pointing down */
+.choice-grid.triangle{grid-template-columns:repeat(4,minmax(0,1fr));max-width:940px;position:relative}
+.choice-grid.triangle .choice-auction{grid-column:1/3}
+.choice-grid.triangle .choice-vault{grid-column:3/5}
+.choice-grid.triangle .choice-profile{grid-column:2/4}
+.choice-profile{background:linear-gradient(180deg,#fff 0%,#f6f8fb 100%)}
+.choice-profile::before{background:linear-gradient(90deg,var(--navy),var(--grey))}
+.choice-profile .icon{min-height:84px;display:grid;place-items:center}
+.choice-profile h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:600px){
+  .choice-grid.triangle{gap:12px}
+  .choice-grid.triangle .choice{padding:22px 12px 16px;border-radius:14px}
+  .choice-grid.triangle .choice .icon{font-size:2.2rem;min-height:0}
+  .choice-grid.triangle .choice .avatar.xl{width:52px;height:52px;font-size:28px}
+  .choice-grid.triangle .choice h2{font-size:.95rem;letter-spacing:.04em}
+  .choice-grid.triangle .choice p.muted{display:none}
+  .choice-grid.triangle .choice .go{font-size:.68rem;letter-spacing:.06em;margin-top:8px}
+}
+@media (max-width:330px){
+  .choice-grid.triangle{grid-template-columns:minmax(0,1fr)}
+  .choice-grid.triangle .choice{grid-column:auto !important}
+}
 .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;padding:50px 0}
 .feature{padding:20px;border-left:4px solid var(--grey);background:var(--grey-bg);border-radius:0 var(--radius) var(--radius) 0}
 
@@ -295,6 +317,7 @@ form.stack input,form.stack select,form.stack textarea{width:100%;min-width:0}
 .acct-chip .acct-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acct-chip:not(:has(.avatar)){padding:4px 14px;background:var(--navy);color:#fff;border-color:var(--navy);text-transform:uppercase}
 .acct-page .page-head{text-align:center}
+.acct-page .page-head p{margin-left:auto;margin-right:auto}
 .acct-panel{max-width:520px;margin:0 auto 30px}
 .acct-panel h2{font-size:1.15rem}
 .acct-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--grey-bg);border-radius:12px;padding:4px;margin-bottom:16px}
@@ -317,6 +340,29 @@ form.stack input,form.stack select,form.stack textarea{width:100%;min-width:0}
 .acct-rule{border:0;border-top:1px solid var(--grey-light);margin:18px 0}
 .acct-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .acct-continue{width:100%;margin-bottom:14px}
+.acct-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;max-width:1060px;margin:0 auto 30px;align-items:start}
+.acct-layout .acct-panel{max-width:none;margin:0}
+.acct-page .acct-continue{max-width:520px;display:flex;margin:0 auto 14px}
+.my-offers-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.my-offers-head h2{margin:0}
+.my-offers-sum{font-size:.85rem;margin:10px 0}
+.my-offers-empty{text-align:center;padding:24px 0}
+.my-offer-list{display:grid;gap:10px}
+.my-offer{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--grey-light);border-radius:12px;text-decoration:none;color:var(--text);background:#fff;transition:.15s}
+.my-offer:hover{border-color:var(--navy);box-shadow:0 4px 14px rgba(11,42,91,.12)}
+.my-offer-thumb .thumb{width:56px;height:56px;aspect-ratio:auto;border-radius:10px;font-size:1.8rem}
+.my-offer-main{display:grid;gap:2px;min-width:0}
+.my-offer-name{font-family:var(--head);font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.my-offer-sub{font-size:.82rem;color:var(--grey)}
+.offer-pill{font-family:var(--head);font-weight:700;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase;padding:6px 10px;border-radius:999px;white-space:nowrap;background:var(--grey-bg);color:var(--grey)}
+.offer-pill.top,.offer-pill.won{background:var(--navy);color:#fff}
+.offer-pill.outbid{background:#fff3e0;color:#b45309}
+@media (max-width:860px){.acct-layout{grid-template-columns:minmax(0,1fr)}.acct-layout .acct-panel{max-width:560px;width:100%;margin:0 auto}}
+@media (max-width:480px){
+  .my-offer{grid-template-columns:48px minmax(0,1fr);row-gap:6px}
+  .my-offer-thumb .thumb{width:48px;height:48px}
+  .offer-pill{grid-column:2;justify-self:start}
+}
 .login-box{display:flex;gap:12px;align-items:flex-start;background:var(--grey-bg);border:1px solid var(--grey-light);border-radius:12px;padding:14px;margin:10px 0}
 .login-box .login-ico{font-size:1.6rem;line-height:1}
 .login-box p{margin:4px 0 10px;font-size:.85rem}

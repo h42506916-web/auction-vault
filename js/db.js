@@ -162,6 +162,18 @@
       async profile(uid) { return check(await sb().from('profiles').select(PROFILE_COLS).eq('id', uid).maybeSingle()); },
       async saveProfile(p) {
         return check(await sb().rpc('save_profile', { p_display_name: p.display_name, p_avatar_emoji: p.avatar_emoji, p_avatar_color: p.avatar_color, p_username: p.username || null }));
+      },
+      // The signed-in buyer's own offers, one row per item (supabase/migration_006.sql).
+      // Returns null when migration 006 hasn't been run yet.
+      async myBids() {
+        const res = await sb().rpc('my_bids');
+        if (res.error && missingFn(res.error)) return null;
+        return (check(res) || []).map(r => ({
+          itemId: r.item_id, name: r.item_name, emoji: r.item_emoji || '📦', image: r.image_url || '',
+          status: r.item_status, endsAt: r.ends_at ? new Date(r.ends_at).getTime() : 0,
+          amount: Number(r.my_amount) || 0, count: r.my_count || 0, lastAt: r.last_bid_at ? new Date(r.last_bid_at).getTime() : 0,
+          top: Number(r.top_amount) || 0, isTop: !!r.is_top
+        }));
       }
     },
 

@@ -1,5 +1,5 @@
-/* Account page: sign up / sign in with a username + password, edit profile (display name and
-   avatar = emoji on a coloured circle), sign out. Needs supabase/migration_005.sql. */
+/* Profile tab (account.html): sign up / sign in with a username + password, customise profile (display name and
+   avatar = emoji on a coloured circle), My offers (migration_006 my_bids), sign out. Needs supabase/migration_005.sql. */
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -162,19 +162,26 @@
 
   function profileView(root) {
     const p = A.profile;
-    root.innerHTML = `<div class="panel acct-panel">
-      ${next ? `<a class="btn acct-continue" href="${AV.esc(next)}">Continue →</a>` : ''}
-      <h2>Edit profile</h2>
-      <form class="stack" id="edit" novalidate>
-        ${pickerHTML(p)}
-        <div class="msg" id="acct-err" role="alert"></div>
-        <button class="btn" type="submit">Save changes</button>
-      </form>
-      <hr class="acct-rule">
-      <div class="acct-foot"><span class="muted">Signed in as <strong>@${AV.esc(p.username)}</strong></span><button class="btn outline" type="button" data-signout>Sign out</button></div>
+    root.innerHTML = `${next ? `<a class="btn acct-continue" href="${AV.esc(next)}">Continue →</a>` : ''}
+    <div class="acct-layout">
+      <div class="panel acct-panel">
+        <h2>Customise your profile</h2>
+        <form class="stack" id="edit" novalidate>
+          ${pickerHTML(p)}
+          <div class="msg" id="acct-err" role="alert"></div>
+          <button class="btn" type="submit">Save changes</button>
+        </form>
+        <hr class="acct-rule">
+        <div class="acct-foot"><span class="muted">Signed in as <strong>@${AV.esc(p.username)}</strong></span><button class="btn outline" type="button" data-signout>Sign out</button></div>
+      </div>
+      <div class="panel acct-panel my-offers">
+        <div class="my-offers-head"><h2>My offers</h2><button class="btn outline small" type="button" data-refresh aria-label="Refresh my offers">↻ Refresh</button></div>
+        <div id="my-offers" aria-live="polite"><div class="spinner" aria-hidden="true"></div></div>
+      </div>
     </div>`;
     const form = root.querySelector('form'); const pick = bindPicker(form, p); const msg = root.querySelector('#acct-err');
     root.querySelector('[data-signout]').addEventListener('click', signOut);
+    root.querySelector('[data-refresh]').addEventListener('click', loadOffers);
     form.addEventListener('submit', async e => {
       e.preventDefault(); if (busy) return;
       const name = form.display_name.value.trim(); const bad = nameProblem(name);
@@ -184,6 +191,39 @@
         AV.toast('Profile saved');
       });
     });
+    loadOffers();
+  }
+
+  /* ---------- my offers ---------- */
+  function offerStatus(o) {
+    const ended = o.status === 'sold' || (o.endsAt && o.endsAt <= Date.now());
+    if (ended) return o.isTop ? ['won', '🏆 You won'] : ['ended', 'Ended'];
+    return o.isTop ? ['top', '🏆 Top offer'] : ['outbid', 'Outbid — top ' + AV.money(o.top)];
+  }
+  function offerRowHTML(o) {
+    const [cls, label] = offerStatus(o); const left = AV.timeLeft(o.endsAt);
+    return `<a class="my-offer" href="auction.html?item=${encodeURIComponent(o.itemId)}">
+      <div class="my-offer-thumb">${AV.thumbHTML(o)}</div>
+      <span class="my-offer-main"><span class="my-offer-name">${AV.esc(o.name)}</span>
+        <span class="my-offer-sub">Your offer <strong>${AV.money(o.amount)}</strong>${o.count > 1 ? ` · ${o.count} offers` : ''}${!left.ended && o.status !== 'sold' ? ` · ⏱️ ${left.text}` : ''}</span></span>
+      <span class="offer-pill ${cls}">${label}</span></a>`;
+  }
+  let offersSeq = 0;
+  async function loadOffers() {
+    const box = $('#my-offers'); if (!box) return;
+    const seq = ++offersSeq;
+    box.innerHTML = '<div class="spinner" aria-hidden="true"></div>';
+    try {
+      const list = await db.account.myBids();
+      if (seq !== offersSeq || !document.body.contains(box)) return;
+      if (list === null) { box.innerHTML = '<p class="muted my-offers-empty">Your offers will show here soon.</p>'; return; }
+      if (!list.length) { box.innerHTML = '<div class="my-offers-empty"><p class="muted">No offers yet.</p><a class="btn" href="auction.html">Browse the Auction →</a></div>'; return; }
+      const tops = list.filter(o => o.isTop && o.status !== 'sold' && o.endsAt > Date.now()).length;
+      box.innerHTML = `<p class="muted my-offers-sum">${list.length} item${list.length === 1 ? '' : 's'} · top offer on ${tops}</p><div class="my-offer-list">${list.map(offerRowHTML).join('')}</div>`;
+    } catch (e) {
+      console.error(e);
+      if (seq === offersSeq && document.body.contains(box)) box.innerHTML = `<p class="msg err">${AV.esc(db.friendly(e))}</p>`;
+    }
   }
 
   /* ---------- actions ---------- */

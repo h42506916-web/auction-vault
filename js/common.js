@@ -544,7 +544,16 @@
       }, 0));
     } catch (e) { console.warn('Accounts unavailable', e); emitAccount(); }
   }
+  // Home page Profile card: show the buyer's own avatar once signed in
+  function renderProfileCard() {
+    const card = document.getElementById('profile-choice'); if (!card) return;
+    const p = acct.ready && acct.session ? acct.profile : null;
+    card.querySelector('[data-profile-icon]').innerHTML = p ? avatarHTML(p, 'xl') : '👤';
+    card.querySelector('[data-profile-title]').textContent = p ? p.display_name : 'Your Profile';
+    card.querySelector('[data-profile-go]').textContent = p ? 'My profile & offers →' : (acct.ready && !acct.session ? 'Sign in / join →' : 'Customise →');
+  }
   function renderChip() {
+    renderProfileCard();
     const el = document.getElementById('acct-chip'); if (!el) return;
     if (!acct.ready) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
@@ -584,14 +593,14 @@
   /* ---------- Header / footer ---------- */
   function renderChrome() {
     const page = document.body.dataset.page || '';
-    const tabs = [['home', 'index.html', 'Home'], ['storage', 'storage.html', 'Storage Units'], ['auction', 'auction.html', 'Auction'], ['support', 'support.html', 'Customer Service']];
+    const tabs = [['home', 'index.html', 'Home'], ['auction', 'auction.html', 'Auction'], ['account', 'account.html', 'Profile'], ['storage', 'storage.html', 'Storage Units'], ['support', 'support.html', 'Customer Service']];
     const header = document.getElementById('site-header');
     if (header) {
       header.className = 'site-header';
       header.innerHTML = `<div class="header-inner">
         <a class="brand" href="index.html"><img src="assets/logo-mark.png" alt="Auction Vault logo"><span>Auction Vault</span></a>
         <button class="menu-toggle" aria-label="Menu">☰</button>
-        <nav class="tabs" aria-label="Main">${tabs.map(t => `<a href="${t[1]}" class="${t[0] === page ? 'active' : ''}">${t[2]}</a>`).join('')}</nav>
+        <nav class="tabs" aria-label="Main">${tabs.filter(t => page !== 'seller' || t[0] !== 'account').map(t => `<a href="${t[1]}" class="${t[0] === page ? 'active' : ''}">${t[2]}</a>`).join('')}</nav>
         <div class="header-tools">${page === 'seller' ? '' : '<a class="acct-chip hidden" id="acct-chip" href="account.html"></a>'}${codeFormHTML}</div>
       </div>`;
       header.querySelector('.menu-toggle').addEventListener('click', () => header.querySelector('.tabs').classList.toggle('open'));
