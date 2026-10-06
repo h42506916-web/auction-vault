@@ -17,12 +17,42 @@
     $('#dealsOnly').addEventListener('change', e => { state.deals = e.target.checked; render(); });
     $('#chips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; state.cat = b.dataset.cat; $('#cat').value = state.cat; syncChips(); render(); });
     $('#grid').addEventListener('click', onGridClick);
-    load(true).then(() => {
-      const hash = decodeURIComponent(location.hash.slice(1)); if (hash && state.loaded) openDetail(hash);
-    });
+    load(true).then(openFromUrl);
     setInterval(tick, 1000);
     // Pick up changes made by the seller or other bidders
     setInterval(() => { if (state.loaded && !document.hidden && !document.getElementById('av-modal')) load(false); }, REFRESH_MS);
+  }
+  // Shareable item links: auction.html?item=<id> (older #<id> links still work).
+  function linkedId() {
+    const q = new URLSearchParams(location.search).get('item');
+    if (q) return q;
+    try { return decodeURIComponent(location.hash.slice(1)); } catch (e) { return ''; }
+  }
+  function openFromUrl() {
+    const id = linkedId(); if (!id || !state.loaded) return;
+    if (AV.getItem(id)) openDetail(id);
+    else { AV.toast('Sorry, that item is no longer listed.'); setItemParam(null); }
+  }
+  function itemLink(id) { return location.origin + location.pathname + '?item=' + encodeURIComponent(id); }
+  function setItemParam(id) {
+    const params = new URLSearchParams(location.search);
+    if (id) params.set('item', id); else params.delete('item');
+    const qs = params.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+  }
+  async function copyLink(id) {
+    const url = itemLink(id);
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(url);
+      else {
+        const ta = document.createElement('textarea'); ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove();
+        if (!ok) throw new Error('copy failed');
+      }
+      AV.toast('Link copied — share it with a friend!');
+    } catch (e) {
+      window.prompt('Copy this link to share the item:', url);
+    }
   }
   function syncChips() { document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.cat === state.cat)); }
 
@@ -170,6 +200,7 @@
         <div>
           <div class="cat">${AV.esc(it.category)}</div>
           <h2 style="letter-spacing:.06em">${AV.esc(it.name)}</h2>
+          <button class="btn outline small" type="button" id="copy-link" data-link="${AV.esc(itemLink(it.id))}" style="margin-bottom:10px">🔗 Copy link</button>
           <p>${AV.esc(it.description || 'No description provided.')}</p>
           <div class="bid-line">${offerLine(n)}</div>
           <div class="bid-amt" style="font-size:1.8rem">${AV.money(n ? it.currentBid : it.startBid)}</div>
@@ -190,7 +221,8 @@
           <div class="history" id="history"><strong>Offer history</strong><div>${n ? 'Loading…' : 'No offers yet. Be the first!'}</div></div>
         </div></div>`);
     openId = id;
-    history.replaceState(null, '', '#' + encodeURIComponent(id));
+    setItemParam(id);
+    body.querySelector('#copy-link').addEventListener('click', () => copyLink(id));
     if (n) AV.db.itemBids(id).then(b => { const h = body.querySelector('#history'); if (h) h.innerHTML = historyHTML(b); })
       .catch(() => { const h = body.querySelector('#history'); if (h) h.innerHTML = '<strong>Offer history</strong><div>Offer history is unavailable right now.</div>'; });
     const form = body.querySelector('#bid-form');
@@ -229,7 +261,7 @@
     if (arr) arr.addEventListener('click', () => { const f = AV.getItem(id); arrangeBidPickup(f, f.currentBid); });
   }
 
-  AV.onModalClose = () => { openId = null; if (location.hash) history.replaceState(null, '', location.pathname + location.search); };
+  AV.onModalClose = () => { openId = null; setItemParam(null); };
   AV.onDataChange = render;
   document.addEventListener('DOMContentLoaded', init);
 })();
