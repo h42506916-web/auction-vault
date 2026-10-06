@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css?v=20261006b"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js?v=20261006b"></script><script src="js/db.js?v=20261006b"></script><script src="js/common.js?v=20261006b"></script>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0B2A5B"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="AV Seller"><meta name="format-detection" content="telephone=no"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="icon" href="assets/logo-mark.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css?v=20261006c"><link rel="stylesheet" href="css/seller.css?v=20261006c"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="js/config.js?v=20261006c"></script><script src="js/db.js?v=20261006c"></script><script src="js/common.js?v=20261006c"></script>
 <meta name="robots" content="noindex,nofollow">
 <title>Seller Dashboard — Auction Vault</title></head>
 <body data-page="seller">
 <header id="site-header"></header>
-<div class="seller-banner hidden" id="banner"><div class="container"><span>🔑 Seller Dashboard · <span id="who"></span></span><span><a href="auction.html">View auction page →</a> &nbsp; <a href="#" id="signout">Sign out</a></span></div></div>
+<div class="seller-banner hidden" id="banner"><div class="container"><span class="sb-who">🔑 Seller Dashboard · <span id="who"></span></span><span class="sb-links"><a href="auction.html" class="sb-auction">View auction page →</a> &nbsp; <a href="#" id="signout">Sign out</a></span></div>
+  <nav class="seller-jump" id="jump" aria-label="Dashboard sections"><a href="#debts">💵 Debts</a><a href="#pickups">📦 Pickups</a><a href="#listings">🏷️ Items</a><a href="#add-item">➕ Add item</a><a href="#tiers-panel">🔐 Vault prices</a><a href="auction.html">Auction ↗</a></nav></div>
 <main class="container">
   <div class="gate panel" id="checking"><div class="spinner" aria-hidden="true"></div><p class="muted">Checking sign-in…</p></div>
   <div class="gate panel hidden" id="gate">
@@ -27,10 +28,10 @@
     <button class="btn" type="button" id="signout2">Sign out</button>
   </div>
   <div id="dash" class="hidden">
-    <div class="page-head"><h1>Seller Dashboard</h1><p>List items for sale, edit or remove them, set discounts, mark items sold, change vault guide prices and see buyers' offers and cash meet-ups, and track who still owes you money. Changes are saved online and show up for every visitor straight away.</p></div>
+    <div class="page-head seller-head"><h1>Seller Dashboard</h1><p>List items for sale, edit or remove them, set discounts, mark items sold, change vault guide prices and see buyers' offers and cash meet-ups, and track who still owes you money. Changes are saved online and show up for every visitor straight away.</p></div>
     <div class="msg err" id="dash-msg" role="alert"></div>
     <div class="seller-grid">
-      <div class="panel">
+      <div class="panel" id="add-item">
         <h3 id="form-title">List a New Item</h3>
         <form class="stack" id="item-form">
           <input type="hidden" name="id">
@@ -50,21 +51,21 @@
             <label>Discount %<input name="discount" type="number" min="0" max="95" step="1" value="0"></label>
           </div>
           <div class="msg" id="form-msg"></div>
-          <div style="display:flex;gap:8px"><button class="btn" type="submit" id="submit-btn" style="flex:1">List Item</button><button class="btn outline hidden" type="button" id="cancel-edit">Cancel</button></div>
+          <div class="form-actions" style="display:flex;gap:8px"><button class="btn" type="submit" id="submit-btn" style="flex:1">List Item</button><button class="btn outline hidden" type="button" id="cancel-edit">Cancel</button></div>
         </form>
       </div>
-      <div class="panel">
+      <div class="panel" id="listings">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <h3 style="margin:0">Current Items (<span id="n">0</span>)</h3>
           <div style="display:flex;gap:6px;flex-wrap:wrap"><select id="filter" style="padding:6px;border-radius:6px;border:1px solid #cfd2d6"><option value="">All items</option><option value="mine">My listings</option><option value="seed">Example items</option><option value="sold">Sold</option><option value="removed">Removed</option></select>
           <button class="btn small grey" id="refresh">Refresh</button></div>
         </div>
-        <div class="table-wrap"><table class="items"><thead><tr><th></th><th>Item</th><th>Offer / Full price</th><th>Discount %</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+        <div class="table-wrap"><table class="items listings"><thead><tr><th></th><th>Item</th><th>Offer / Full price</th><th>Discount %</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
       </div>
     </div>
     <div class="panel pickups-panel" id="tiers-panel">
       <h3 style="margin:0">Storage Vault Guide Prices</h3>
-      <div class="table-wrap"><table class="items"><thead><tr><th></th><th>Vault</th><th>Price ($)</th><th>Shown</th><th></th></tr></thead><tbody id="tier-rows"></tbody></table></div>
+      <div class="table-wrap"><table class="items tier-table"><thead><tr><th></th><th>Vault</th><th>Price ($)</th><th>Shown</th><th></th></tr></thead><tbody id="tier-rows"></tbody></table></div>
     </div>
     <div class="panel pickups-panel" id="debts">
       <div class="debts-head">
@@ -76,7 +77,7 @@
       <div class="receipts" id="debt-cards"></div>
       <details class="paid-history" id="paid-history">
         <summary>Paid history (<span id="paid-n">0</span>) · <span id="paid-total">$0.00</span> received</summary>
-        <div class="table-wrap"><table class="items"><thead><tr><th>Paid</th><th>Buyer</th><th>Item</th><th>Amount</th><th></th></tr></thead><tbody id="paid-rows"></tbody></table></div>
+        <div class="table-wrap"><table class="items paid-table"><thead><tr><th>Paid</th><th>Buyer</th><th>Item</th><th>Amount</th><th></th></tr></thead><tbody id="paid-rows"></tbody></table></div>
       </details>
     </div>
     <div class="panel pickups-panel" id="pickups">
@@ -89,5 +90,5 @@
   </div>
 </main>
 <footer id="site-footer"></footer>
-<script src="js/seller.js?v=20261006b"></script>
+<script src="js/seller.js?v=20261006c"></script>
 </body></html>

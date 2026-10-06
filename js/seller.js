@@ -91,12 +91,12 @@
         : `<button class="btn small outline" data-act="edit">Edit</button> <button class="btn small ${it.sold ? 'grey' : 'outline'}" data-act="sold">${it.sold ? 'Relist' : 'Mark sold'}</button> <button class="btn small danger" data-act="del">Remove</button>`;
       return `<tr data-id="${AV.esc(it.id)}">
         <td class="em">${AV.esc(it.emoji || '📦')}</td>
-        <td><strong>${AV.esc(it.name)}</strong><br><span class="tag ${it.source === 'seller' ? 'mine' : ''}">${it.source === 'seller' ? 'My listing' : 'Example'}</span>
+        <td class="cell-main"><strong>${AV.esc(it.name)}</strong><br><span class="tag ${it.source === 'seller' ? 'mine' : ''}">${it.source === 'seller' ? 'My listing' : 'Example'}</span>
           <span class="muted" style="font-size:.75rem">${AV.esc(it.category)} · ${AV.esc(statusText(it))}</span></td>
-        <td>${AV.money(n ? it.currentBid : it.startBid)} <span class="muted">(${n})</span><br>
+        <td data-label="Offer / Full price">${AV.money(n ? it.currentBid : it.startBid)} <span class="muted">(${n})</span><br>
           ${it.discount > 0 ? `<span class="strike">${AV.money(it.buyNow)}</span><span class="sale-price">${AV.money(AV.salePrice(it))}</span>` : AV.money(it.buyNow)}</td>
-        <td><input class="disc" type="number" min="0" max="95" step="1" value="${Number(it.discount) || 0}" aria-label="Discount percent"> <button class="btn small" data-act="disc">Set</button></td>
-        <td style="white-space:nowrap">${actions}</td>
+        <td data-label="Discount %"><input class="disc" type="number" inputmode="numeric" min="0" max="95" step="1" value="${Number(it.discount) || 0}" aria-label="Discount percent"> <button class="btn small" data-act="disc">Set</button></td>
+        <td class="actions" style="white-space:nowrap">${actions}</td>
       </tr>`;
     }).join('') || `<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">${f === 'removed' ? 'No removed items.' : 'No items yet. List one using the form.'}</td></tr>`;
   }
@@ -177,10 +177,10 @@
   function renderTiers() {
     $('#tier-rows').innerHTML = tiers.map(t => `<tr data-id="${AV.esc(t.id)}">
         <td class="em">${AV.esc(t.emoji)}</td>
-        <td><strong>${AV.esc(t.name)}</strong>${t.ribbon ? `<br><span class="tag">${AV.esc(t.ribbon)}</span>` : ''}</td>
-        <td><input class="disc tier-price" type="number" min="0" step="0.01" value="${t.price}" aria-label="Price for ${AV.esc(t.name)}" style="width:90px"></td>
-        <td><input class="tier-active" type="checkbox" ${t.active ? 'checked' : ''} aria-label="Show on Storage page"></td>
-        <td><button class="btn small" data-tier="save">Save</button></td>
+        <td class="cell-main"><strong>${AV.esc(t.name)}</strong>${t.ribbon ? `<br><span class="tag">${AV.esc(t.ribbon)}</span>` : ''}</td>
+        <td data-label="Price ($)"><input class="disc tier-price" type="number" inputmode="decimal" min="0" step="0.01" value="${t.price}" aria-label="Price for ${AV.esc(t.name)}" style="width:90px"></td>
+        <td data-label="Shown on Storage page"><input class="tier-active" type="checkbox" ${t.active ? 'checked' : ''} aria-label="Show on Storage page"></td>
+        <td class="actions"><button class="btn small" data-tier="save">Save</button></td>
       </tr>`).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:20px">No vault tiers found. Run supabase/schema.sql to add them.</td></tr>';
   }
   async function onTierClick(e) {
@@ -198,12 +198,12 @@
     $('#pu-rows').innerHTML = pickups.map(p => {
       const it = p.item_id ? items.find(i => i.id === p.item_id) : tiers.find(t => t.id === p.tier_id);
       return `<tr data-id="${AV.esc(p.id)}" class="${p.collected ? 'collected' : ''}">
-        <td style="white-space:nowrap">${AV.esc(new Date(p.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }))}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.reference)}</span></td>
-        <td><span class="em-inline">${AV.esc((it && it.emoji) || '📦')}</span> <strong>${AV.esc(p.item_name)}</strong><br><span class="tag">${AV.esc(AV.typeLabel(p.purchase_type))}</span></td>
-        <td><strong>${AV.money(p.price)}</strong><br>${p.paid ? '<span class="tag paid">✓ Paid</span>' : '<span class="muted" style="font-size:.75rem">💵 Cash at meet-up</span>'}</td>
-        <td><strong>${AV.esc(p.buyer_name)}</strong>${p.class ? `<br><span class="muted">${AV.esc(p.class)}</span>` : ''}${p.contact ? `<br><span class="muted">${AV.esc(p.contact)}</span>` : ''}</td>
-        <td><strong>${AV.esc(p.meetup)}</strong><br>${AV.esc(p.time)}</td>
-        <td style="white-space:nowrap"><button class="btn small ${p.collected ? 'grey' : 'outline'}" data-pu="collected">${p.collected ? '✓ Collected' : 'Mark collected'}</button> <button class="btn small danger" data-pu="del">Remove</button></td>
+        <td data-label="Submitted" style="white-space:nowrap">${AV.esc(new Date(p.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }))}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.reference)}</span></td>
+        <td class="cell-main"><span class="em-inline">${AV.esc((it && it.emoji) || '📦')}</span> <strong>${AV.esc(p.item_name)}</strong><br><span class="tag">${AV.esc(AV.typeLabel(p.purchase_type))}</span></td>
+        <td data-label="Offer"><strong>${AV.money(p.price)}</strong><br>${p.paid ? '<span class="tag paid">✓ Paid</span>' : '<span class="muted" style="font-size:.75rem">💵 Cash at meet-up</span>'}</td>
+        <td data-label="Buyer"><strong>${AV.esc(p.buyer_name)}</strong>${p.class ? `<br><span class="muted">${AV.esc(p.class)}</span>` : ''}${p.contact ? `<br><span class="muted">${AV.esc(p.contact)}</span>` : ''}</td>
+        <td data-label="Meet-up"><strong>${AV.esc(p.meetup)}</strong><br>${AV.esc(p.time)}</td>
+        <td class="actions" style="white-space:nowrap"><button class="btn small ${p.collected ? 'grey' : 'outline'}" data-pu="collected">${p.collected ? '✓ Collected' : 'Mark collected'}</button> <button class="btn small danger" data-pu="del">Remove</button></td>
       </tr>`;
     }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No pickups or offers yet. They appear here when a buyer makes an offer (auction or storage vault) and picks a meet-up.</td></tr>';
   }
@@ -276,11 +276,11 @@
     $('#paid-n').textContent = paid.length;
     $('#paid-total').textContent = AV.money(sumMoney(paid));
     $('#paid-rows').innerHTML = paid.map(p => `<tr data-id="${AV.esc(p.id)}">
-        <td style="white-space:nowrap">${AV.esc(fmtDate(p.paid_at, true) || '—')}</td>
-        <td><strong>${AV.esc(p.buyer_name)}</strong>${p.class ? ` <span class="muted">${AV.esc(p.class)}</span>` : ''}</td>
-        <td>${AV.esc(p.item_name)}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.reference)}</span></td>
-        <td><strong>${AV.money(p.price)}</strong></td>
-        <td><button class="btn small outline" type="button" data-paid="undo">Undo</button></td>
+        <td data-label="Paid" style="white-space:nowrap">${AV.esc(fmtDate(p.paid_at, true) || '—')}</td>
+        <td data-label="Buyer"><strong>${AV.esc(p.buyer_name)}</strong>${p.class ? ` <span class="muted">${AV.esc(p.class)}</span>` : ''}</td>
+        <td data-label="Item">${AV.esc(p.item_name)}<br><span class="muted" style="font-size:.72rem">${AV.esc(p.reference)}</span></td>
+        <td data-label="Amount"><strong>${AV.money(p.price)}</strong></td>
+        <td class="actions"><button class="btn small outline" type="button" data-paid="undo">Undo</button></td>
       </tr>`).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">Nothing marked paid yet.</td></tr>';
   }
   async function setPaid(ids, paid, controls) {
@@ -315,7 +315,33 @@
     }
   }
 
+  /* ---------- Mobile section jump menu ---------- */
+  function initJump() {
+    const nav = $('#jump'); if (!nav) return;
+    const links = [...nav.querySelectorAll('a[href^="#"]')];
+    const setActive = id => links.forEach(a => {
+      const on = a.getAttribute('href') === '#' + id;
+      a.classList.toggle('active', on);
+      if (on && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: a.offsetLeft - 12, behavior: 'smooth' });
+    });
+    nav.addEventListener('click', e => {
+      const a = e.target.closest('a[href^="#"]'); if (!a) return;
+      const target = document.getElementById(a.getAttribute('href').slice(1)); if (!target) return;
+      e.preventDefault(); setActive(target.id);
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    if (!('IntersectionObserver' in window)) return;
+    const seen = new Map();
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => seen.set(en.target.id, en.isIntersecting ? en.boundingClientRect.top : null));
+      const vis = [...seen.entries()].filter(([, top]) => top !== null).sort((a, b) => a[1] - b[1]);
+      if (vis.length) setActive(vis[0][0]);
+    }, { rootMargin: '-120px 0px -55% 0px' });
+    links.forEach(a => { const el = document.getElementById(a.getAttribute('href').slice(1)); if (el) io.observe(el); });
+  }
+
   document.addEventListener('DOMContentLoaded', async () => {
+    initJump();
     $('#f-cat').innerHTML = AV.CATEGORIES.map(c => `<option>${AV.esc(c)}</option>`).join('');
     $('#login-email').value = db.adminEmail; setSendLabel();
     $('#login-email').addEventListener('input', setSendLabel);
