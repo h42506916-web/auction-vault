@@ -627,7 +627,50 @@
   window.addEventListener('storage', () => { if (window.AV && AV.onDataChange) AV.onDataChange(); });
   // The old storage-vault cart is gone (vaults now go through offers); tidy up its leftover data.
   try { localStorage.removeItem('av_cart_v1'); localStorage.removeItem('av_orders_v1'); } catch (e) {}
-  document.addEventListener('DOMContentLoaded', () => { renderChrome(); if (document.body.dataset.page !== 'seller') initAccount(); });
+  /* ---------- "How To Roll" welcome screen (first visit only, every public page) ---------- */
+  const HOWTO_KEY = 'av_howto_seen_v1';
+  const HOWTO_TEXT = 'Make an account, make an offer on anything you like (the highest offer wins), then pay cash at a school meet-up spot at lunch or recess.';
+  const howtoSeen = () => { try { return localStorage.getItem(HOWTO_KEY) === '1'; } catch (e) { return false; } };
+  const howtoWanted = !/(^|\/)seller\.html$/i.test(location.pathname) && !howtoSeen();
+  // Hide the page straight away (this script runs in <head>) so it never flashes before the overlay
+  if (howtoWanted) document.documentElement.classList.add('howto-open');
+  function showHowTo() {
+    if (!howtoWanted || document.body.dataset.page === 'seller' || document.getElementById('howto')) {
+      document.documentElement.classList.remove('howto-open'); return;
+    }
+    const el = document.createElement('div');
+    el.id = 'howto'; el.className = 'howto-overlay';
+    el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'howto-title');
+    el.innerHTML = `<div class="howto-inner">
+        <img class="howto-logo" src="assets/logo-mark.png" alt="" width="72" height="72">
+        <h1 id="howto-title">How To Roll</h1>
+        <p class="howto-text">${esc(HOWTO_TEXT)}</p>
+        <button type="button" class="btn howto-skip">Skip to the website →</button>
+      </div>`;
+    document.body.appendChild(el);
+    const btn = el.querySelector('.howto-skip');
+    let closed = false;
+    const close = () => {
+      if (closed) return; closed = true;
+      try { localStorage.setItem(HOWTO_KEY, '1'); } catch (e) {}
+      document.removeEventListener('keydown', onKey);
+      document.documentElement.classList.remove('howto-open');
+      el.classList.add('closing');
+      const done = () => { el.remove(); };
+      el.addEventListener('transitionend', done, { once: true });
+      setTimeout(done, 600); // in case transitions are off
+    };
+    const onKey = e => {
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      else if (e.key === 'Tab') { e.preventDefault(); btn.focus(); } // keep focus inside
+    };
+    btn.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    el.addEventListener('touchmove', e => { if (el.scrollHeight <= el.clientHeight) e.preventDefault(); }, { passive: false });
+    requestAnimationFrame(() => btn.focus({ preventScroll: true }));
+  }
+
+  document.addEventListener('DOMContentLoaded', () => { showHowTo(); renderChrome(); if (document.body.dataset.page !== 'seller') initAccount(); });
 
   window.AV = Object.assign(window.AV || {}, {
     KEYS, CATEGORIES, OWNER_PHONE, HOUR, getItems, getItem, myBid, setMyBid,

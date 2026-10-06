@@ -434,3 +434,20 @@ form.stack .bad{border-color:var(--danger);box-shadow:0 0 0 3px rgba(229,57,53,.
   .ls-disc .btn{flex:none}
   .listing-page{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
 }
+
+/* "How To Roll" first-visit welcome screen (js/common.js) */
+html.howto-open,html.howto-open body{overflow:hidden;overscroll-behavior:none}
+html.howto-open body>*:not(.howto-overlay){visibility:hidden}
+.howto-overlay{position:fixed;inset:0;z-index:1000;background:#fff;display:flex;align-items:center;justify-content:center;
+  min-height:100vh;min-height:100dvh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  padding:max(24px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left));
+  opacity:1;transition:opacity .35s ease,visibility .35s;animation:howto-in .3s ease}
+.howto-overlay.closing{opacity:0;visibility:hidden;pointer-events:none}
+@keyframes howto-in{from{opacity:0}to{opacity:1}}
+.howto-inner{max-width:560px;width:100%;text-align:center;margin:auto}
+.howto-logo{width:72px;height:72px;object-fit:contain;margin:0 auto 10px;display:block}
+.howto-overlay h1{font-family:var(--head);color:var(--navy);text-transform:uppercase;letter-spacing:.14em;font-weight:800;font-size:clamp(1.9rem,7vw,2.8rem);margin:0 0 14px;line-height:1.15}
+.howto-overlay h1::after{content:"";display:block;width:64px;height:4px;border-radius:2px;background:var(--grey);margin:14px auto 0}
+.howto-text{font-size:clamp(1.05rem,4.2vw,1.25rem);line-height:1.6;color:var(--text);margin:0 auto 28px;max-width:30em}
+.howto-skip{min-height:44px;min-width:44px;padding:10px 20px;font-size:.8rem;display:inline-flex;align-items:center;justify-content:center;touch-action:manipulation}
+@media (prefers-reduced-motion:reduce){.howto-overlay{transition:none;animation:none}}
