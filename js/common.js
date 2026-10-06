@@ -547,6 +547,10 @@
     }
   }
 
+  // No pinch / double-tap zoom (iOS Safari ignores user-scalable=no in the viewport meta)
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+  document.addEventListener('touchmove', e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
   window.addEventListener('storage', () => { if (window.AV && AV.onDataChange) AV.onDataChange(); });
   // The old storage-vault cart is gone (vaults now go through offers); tidy up its leftover data.
   try { localStorage.removeItem('av_cart_v1'); localStorage.removeItem('av_orders_v1'); } catch (e) {}

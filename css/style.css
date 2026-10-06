@@ -7,9 +7,9 @@
   --body:'Inter','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;touch-action:manipulation}
 body{font-family:var(--body);color:var(--text);background:#fff;line-height:1.5;min-height:100vh;display:flex;flex-direction:column}
-main{flex:1}
+main{flex:1;width:100%;min-width:0}  /* full width: an auto-margin flex item would otherwise grow to its widest content (e.g. a table) and widen the page */
 a{color:var(--navy)}
 h1,h2,h3,h4,.brand,.btn,.tabs a,.badge,.label{font-family:var(--head)}
 h1,h2,h3{text-transform:uppercase;letter-spacing:.12em;color:var(--navy);font-weight:800;margin:.2em 0 .5em}
@@ -157,7 +157,8 @@ form.stack input,form.stack select,form.stack textarea{padding:10px;border:1px s
 .call-card a{font-weight:800;color:var(--navy)}
 
 /* Seller */
-.seller-grid{display:grid;grid-template-columns:380px 1fr;gap:26px;align-items:start}
+.seller-grid{display:grid;grid-template-columns:380px minmax(0,1fr);gap:26px;align-items:start}
+.seller-grid>*{min-width:0}  /* wide tables scroll inside their panel instead of widening the page */
 .panel{border:1px solid var(--grey-light);border-radius:14px;padding:20px;background:#fff;box-shadow:var(--shadow)}
 table.items{width:100%;border-collapse:collapse;font-size:.86rem}
 table.items th{text-align:left;font-family:var(--head);text-transform:uppercase;letter-spacing:.06em;font-size:.7rem;color:var(--grey);padding:8px 6px;border-bottom:2px solid var(--grey-light)}
@@ -267,7 +268,7 @@ table.pickups tr.collected td{opacity:.55}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;z-index:200;box-shadow:var(--shadow);font-weight:600;font-size:.9rem}
 
 @media (max-width:860px){
-  .seller-grid{grid-template-columns:1fr}
+  .seller-grid{grid-template-columns:minmax(0,1fr)}
   .detail{grid-template-columns:1fr}
 }
 @media (max-width:760px){
