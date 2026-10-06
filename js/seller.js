@@ -54,9 +54,16 @@
     $('#dash-msg').textContent = '';
     await Promise.all([loadItems(), loadTiers(), loadPickups()]);
   }
+  let listers = {};
+  function sourceTag(it) {
+    if (it.ownerId) { const l = listers[it.id]; return `<span class="tag">${l ? 'By @' + AV.esc(l.username) : 'Buyer listing'}</span>`; }
+    return `<span class="tag ${it.source === 'seller' ? 'mine' : ''}">${it.source === 'seller' ? 'My listing' : 'Example'}</span>`;
+  }
   async function loadItems() {
     $('#rows').innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center;padding:30px">Loading…</td></tr>';
-    try { items = await db.admin.items(); renderRows(); if (pickups.length) renderDebts(); } catch (e) { dashError(e); $('#rows').innerHTML = ''; }
+    try { items = await db.admin.items(); renderRows(); if (pickups.length) renderDebts(); } catch (e) { dashError(e); $('#rows').innerHTML = ''; return; }
+    // Items listed by buyers on the Listing tab (migration_007): show who listed them
+    try { const l = await db.listers(); if (l) { listers = l; renderRows(); } } catch (e) { console.warn('Listers unavailable', e); }
   }
   async function loadTiers() {
     try { tiers = await db.admin.tiers(); renderTiers(); if (pickups.length) { renderPickups(); renderDebts(); } } catch (e) { dashError(e); }
@@ -91,7 +98,7 @@
         : `<button class="btn small outline" data-act="edit">Edit</button> <button class="btn small ${it.sold ? 'grey' : 'outline'}" data-act="sold">${it.sold ? 'Relist' : 'Mark sold'}</button> <button class="btn small danger" data-act="del">Remove</button>`;
       return `<tr data-id="${AV.esc(it.id)}">
         <td class="em">${AV.esc(it.emoji || '📦')}</td>
-        <td class="cell-main"><strong>${AV.esc(it.name)}</strong><br><span class="tag ${it.source === 'seller' ? 'mine' : ''}">${it.source === 'seller' ? 'My listing' : 'Example'}</span>
+        <td class="cell-main"><strong>${AV.esc(it.name)}</strong><br>${sourceTag(it)}
           <span class="muted" style="font-size:.75rem">${AV.esc(it.category)} · ${AV.esc(statusText(it))}</span></td>
         <td data-label="Offer / Full price">${AV.money(n ? it.currentBid : it.startBid)} <span class="muted">(${n})</span><br>
           ${it.discount > 0 ? `<span class="strike">${AV.money(it.buyNow)}</span><span class="sale-price">${AV.money(AV.salePrice(it))}</span>` : AV.money(it.buyNow)}</td>

@@ -593,14 +593,14 @@
   /* ---------- Header / footer ---------- */
   function renderChrome() {
     const page = document.body.dataset.page || '';
-    const tabs = [['home', 'index.html', 'Home'], ['auction', 'auction.html', 'Auction'], ['account', 'account.html', 'Profile'], ['storage', 'storage.html', 'Storage Units'], ['support', 'support.html', 'Customer Service']];
+    const tabs = [['home', 'index.html', 'Home'], ['auction', 'auction.html', 'Auction'], ['listing', 'listing.html', 'Listing'], ['account', 'account.html', 'Profile'], ['storage', 'storage.html', 'Storage Units'], ['support', 'support.html', 'Customer Service']];
     const header = document.getElementById('site-header');
     if (header) {
       header.className = 'site-header';
       header.innerHTML = `<div class="header-inner">
         <a class="brand" href="index.html"><img src="assets/logo-mark.png" alt="Auction Vault logo"><span>Auction Vault</span></a>
         <button class="menu-toggle" aria-label="Menu">☰</button>
-        <nav class="tabs" aria-label="Main">${tabs.filter(t => page !== 'seller' || t[0] !== 'account').map(t => `<a href="${t[1]}" class="${t[0] === page ? 'active' : ''}">${t[2]}</a>`).join('')}</nav>
+        <nav class="tabs" aria-label="Main">${tabs.filter(t => page !== 'seller' || (t[0] !== 'account' && t[0] !== 'listing')).map(t => `<a href="${t[1]}" class="${t[0] === page ? 'active' : ''}">${t[2]}</a>`).join('')}</nav>
         <div class="header-tools">${page === 'seller' ? '' : '<a class="acct-chip hidden" id="acct-chip" href="account.html"></a>'}${codeFormHTML}</div>
       </div>`;
       header.querySelector('.menu-toggle').addEventListener('click', () => header.querySelector('.tabs').classList.toggle('open'));

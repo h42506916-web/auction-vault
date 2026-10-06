@@ -9,7 +9,8 @@
 -- and supabase/migration_003.sql (rejects joke / fake / rude buyer entries)
 -- and supabase/migration_004.sql (debts / paid tracking, public top offers)
 -- and supabase/migration_005.sql (buyer accounts: profiles + avatars on offers)
--- and supabase/migration_006.sql (my_bids: "My offers" on the Profile tab).
+-- and supabase/migration_006.sql (my_bids: "My offers" on the Profile tab)
+-- and supabase/migration_007.sql (Listing tab: buyers list + manage their own items).
 
 create extension if not exists pgcrypto;  -- gen_random_uuid() (already on in Supabase)
 

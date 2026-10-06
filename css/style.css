@@ -22,13 +22,18 @@ h3{font-size:1.05rem;letter-spacing:.08em}
 
 /* Header */
 .site-header{background:#fff;border-bottom:3px solid var(--navy);position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,.04)}
-.header-inner{display:flex;align-items:center;gap:18px;padding:10px 20px;max-width:1200px;margin:0 auto;flex-wrap:wrap}
+.header-inner{display:flex;align-items:center;gap:16px;padding:10px 20px;max-width:1320px;margin:0 auto;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--navy);font-weight:800;letter-spacing:.18em;text-transform:uppercase;font-size:1.05rem;white-space:nowrap}
 .brand img{height:42px;width:auto}
-.tabs{display:flex;gap:4px;flex-wrap:wrap;flex:1}
-.tabs a{text-decoration:none;color:var(--navy);text-transform:uppercase;letter-spacing:.1em;font-weight:700;font-size:.8rem;padding:10px 12px;border-radius:6px;border-bottom:3px solid transparent}
+.tabs{display:flex;gap:2px;flex-wrap:wrap;flex:1;min-width:0}
+.tabs a{text-decoration:none;color:var(--navy);text-transform:uppercase;letter-spacing:.08em;font-weight:700;font-size:.78rem;padding:10px 10px;border-radius:6px;border-bottom:3px solid transparent;white-space:nowrap}
 .tabs a:hover{background:var(--grey-bg)}
 .tabs a.active{border-bottom-color:var(--grey);background:var(--grey-bg)}
+/* 6 tabs: keep one row on laptops by dropping the brand word first */
+@media (min-width:761px){.acct-chip .acct-name{max-width:110px}}
+@media (min-width:761px) and (max-width:1300px){.tabs a{padding:10px 8px;letter-spacing:.05em}}
+@media (min-width:1061px) and (max-width:1220px){.brand span{display:none}}
+@media (min-width:761px) and (max-width:1060px){.header-tools{margin-left:auto}.tabs{order:5;flex-basis:100%;justify-content:center}}
 .header-tools{display:flex;align-items:center;gap:10px}
 .code-form{display:flex;align-items:center;gap:4px;position:relative}
 .code-form input{width:96px;padding:6px 8px;font-size:.75rem;border:1px solid var(--grey);border-radius:6px;font-family:var(--body)}
@@ -388,4 +393,47 @@ form.stack input,form.stack select,form.stack textarea{width:100%;min-width:0}
   .color-grid{grid-template-columns:repeat(5,1fr);gap:10px}
   .color-opt{min-height:44px}
   .acct-page .page-head p{font-size:.9rem}
+}
+
+/* Listing tab (listing.html) + "Listed by" on auction items */
+.listing-page .page-head{text-align:center}
+.listing-page .page-head p{margin-left:auto;margin-right:auto}
+.listing-page .acct-panel{max-width:560px}
+.listing-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px;max-width:1100px;margin:0 auto 30px;align-items:start}
+.listing-layout>.panel{min-width:0}
+.listing-layout h2{font-size:1.15rem}
+.listing-layout .offering-as{margin:0 0 14px}
+.quick-emoji{display:flex;flex-wrap:wrap;gap:6px;margin-top:-4px}
+.quick-emoji .emoji-opt{width:40px;height:40px;min-height:40px;font-size:20px;aspect-ratio:auto}
+.listing-page .form-actions{display:flex;gap:8px}
+.listing-page .form-actions .btn{flex:1}
+.listing-note{font-size:.8rem;margin:2px 0 0}
+form.stack .bad{border-color:var(--danger);box-shadow:0 0 0 3px rgba(229,57,53,.15)}
+.my-listing{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px 12px;align-items:center;padding:12px;border:1px solid var(--grey-light);border-radius:12px;background:#fff}
+.my-listing.sold,.my-listing.ended{background:var(--grey-bg)}
+.my-listing .my-offer-thumb .thumb{width:64px;height:64px;aspect-ratio:auto;border-radius:10px;font-size:2rem}
+.ls-status{font-weight:700;color:var(--navy)}
+.ls-status.sold{color:var(--success)}
+.ls-status.ended{color:var(--grey)}
+.ls-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ls-disc{display:inline-flex;gap:4px;align-items:center}
+.ls-disc input{width:64px;padding:6px 8px;border:1px solid #cfd2d6;border-radius:8px;font:inherit}
+.listed-by{display:flex;align-items:center;gap:4px;font-size:.8rem;color:var(--grey);margin:2px 0 4px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.listed-by strong{color:var(--navy);overflow:hidden;text-overflow:ellipsis}
+.listed-by .avatar.sm{margin:0 2px}
+.avatar.av-house{background:#fff;box-shadow:inset 0 0 0 1px var(--grey-light)}
+.avatar.av-house img{width:16px;height:16px;object-fit:contain}
+.badge.mine{top:auto;bottom:8px;background:var(--navy)}
+.own-listing{margin:10px 0}
+@media (max-width:900px){.listing-layout{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){
+  .listing-page form.stack input,.listing-page form.stack select,.listing-page form.stack textarea,.ls-disc input{font-size:16px;min-height:44px}
+  .listing-page .btn,.listing-page .offering-as a{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  .quick-emoji .emoji-opt{width:44px;height:44px}
+  .listing-layout>.panel{padding:16px}
+  .ls-actions{display:grid;grid-template-columns:1fr 1fr}
+  .ls-actions .ls-disc{grid-column:1/-1}
+  .ls-disc input{flex:1;width:auto;min-width:0}
+  .ls-disc .btn{flex:none}
+  .listing-page{padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right))}
 }

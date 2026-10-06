@@ -60,7 +60,8 @@
       id: r.id, name: r.name, description: r.description || '', category: r.category || 'Other', emoji: r.emoji || '📦',
       image: r.image_url || '', startBid: num(r.starting_bid), currentBid: num(r.current_bid), buyNow: num(r.buy_now),
       discount: num(r.discount), bidCount: num(r.bid_count), endsAt: Date.parse(r.ends_at), status: r.status,
-      sold: r.status === 'sold', removed: r.status === 'removed', source: r.source || 'seller', createdAt: Date.parse(r.created_at) || 0
+      sold: r.status === 'sold', removed: r.status === 'removed', source: r.source || 'seller', createdAt: Date.parse(r.created_at) || 0,
+      ownerId: r.owner_id || null
     };
   }
   const tierFromRow = r => ({ id: r.id, name: r.name, emoji: r.emoji, price: num(r.price), perks: r.perks || [], ribbon: r.ribbon || '', cls: r.cls || '', sort: r.sort || 0, active: r.active !== false });
@@ -113,6 +114,37 @@
         } catch (e) { /* leave this item without a top offer */ }
       }));
       return out;
+    },
+
+    // Who listed each item: { [itemId]: { username, by, emoji, color } } (supabase/migration_007.sql).
+    // null before that migration runs.
+    async listers() {
+      const res = await sb().rpc('item_listers');
+      if (res.error && missingFn(res.error)) return null;
+      const out = {};
+      (check(res) || []).forEach(r => { out[r.item_id] = { username: r.username || '', by: r.display_name || '', emoji: r.avatar_emoji || '', color: r.avatar_color || '' }; });
+      return out;
+    },
+
+    /* ----- Listing tab: a signed-in buyer's own items (supabase/migration_007.sql) ----- */
+    listing: {
+      // null = migration 007 not run yet
+      async mine() {
+        const res = await sb().rpc('my_items');
+        if (res.error && missingFn(res.error)) return null;
+        return (check(res) || []).map(fromRow);
+      },
+      async create(p) {
+        return check(await sb().rpc('create_my_item', { p_name: p.name, p_description: p.description, p_category: p.category, p_emoji: p.emoji,
+          p_image_url: p.image_url, p_starting_bid: p.starting_bid, p_buy_now: p.buy_now, p_days: p.days, p_discount: p.discount }));
+      },
+      // patch keys: name, description, category, emoji, image_url, starting_bid, buy_now, days, discount, status ('active'|'sold')
+      async update(id, patch) {
+        const args = { p_id: id };
+        Object.keys(patch).forEach(k => { if (patch[k] != null) args['p_' + k] = patch[k]; });
+        return check(await sb().rpc('update_my_item', args));
+      },
+      async remove(id) { return check(await sb().rpc('remove_my_item', { p_id: id })); }
     },
 
     /* ----- public writes (RPC, validated in the database) ----- */

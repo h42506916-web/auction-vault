@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   const $ = s => document.querySelector(s);
-  const state = { q: '', cat: '', sort: 'ending', deals: false, loaded: false, top: {}, topLoaded: false };
+  const state = { q: '', cat: '', sort: 'ending', deals: false, loaded: false, top: {}, topLoaded: false, listers: {}, listersOn: false };
   const REFRESH_MS = 30000;
   let openId = null;
 
@@ -60,7 +60,7 @@
     if (showSpinner) { $('#count').textContent = ''; $('#grid').innerHTML = AV.db.loadingHTML('Loading auction items…'); }
     try {
       await AV.db.loadItems(); state.loaded = true; render();
-      loadTop();
+      loadTop(); loadListers();
     } catch (e) {
       console.error(e);
       if (!state.loaded) {
@@ -76,6 +76,22 @@
     try { state.top = await AV.db.topOffers(AV.getItems()); state.topLoaded = true; render(); updateDetailTop(); }
     catch (e) { console.warn('Top offers unavailable', e); }
   }
+  // Who listed each item (supabase/migration_007.sql; nothing is shown before it runs)
+  async function loadListers() {
+    try {
+      const l = await AV.db.listers(); if (!l) return;
+      state.listers = l; state.listersOn = true; render();
+      const el = openId && document.querySelector('#av-modal #listed-by'); const it = openId && AV.getItem(openId);
+      if (el && it) el.innerHTML = listerHTML(it);
+    } catch (e) { console.warn('Listers unavailable', e); }
+  }
+  function listerHTML(it) {
+    if (!state.listersOn) return '';
+    const l = it.ownerId && state.listers[it.id];
+    if (l) return `<div class="listed-by">Listed by ${AV.avatarHTML(l, 'sm')}<strong>${AV.esc(l.by)}</strong></div>`;
+    return '<div class="listed-by">Listed by <span class="avatar sm av-house" aria-hidden="true"><img src="assets/logo-mark.png" alt=""></span><strong>Auction Vault</strong></div>';
+  }
+  const isMine = it => !!(it && it.ownerId && AV.account.session && AV.account.session.user && it.ownerId === AV.account.session.user.id);
   function topHTML(it) {
     const t = state.top[it.id];
     if (t) return `<div class="top-offer" title="Highest offer so far">🏆 Top offer: <strong>${AV.money(t.amount)}</strong> by ${AV.avatarHTML(t, 'sm')}<strong>${AV.esc(t.by)}</strong></div>`;
@@ -116,6 +132,7 @@
     if (it.discount > 0) b += `<span class="badge">${Math.round(it.discount)}% OFF</span>`;
     if (it.sold) b += `<span class="badge sold">SOLD</span>`;
     else if (it.source === 'seller') b += `<span class="badge new">NEW</span>`;
+    if (isMine(it)) b += `<span class="badge mine">YOUR LISTING</span>`;
     return b;
   }
   const offerLine = n => `${n ? 'Highest offer' : 'Starting offer'} · ${n} offer${n === 1 ? '' : 's'}`;
@@ -136,6 +153,7 @@
         <div class="card-body">
           <div class="cat">${AV.esc(it.category)}</div>
           <div class="card-title">${AV.esc(it.name)}</div>
+          ${listerHTML(it)}
           <div class="bid-line">${offerLine(n)}</div>
           <div class="bid-amt">${AV.money(n ? it.currentBid : it.startBid)}</div>
           ${topHTML(it)}
@@ -173,7 +191,7 @@
   // The item is marked sold in the database (buy_now RPC) when the buyer confirms the last step.
   function buyNow(id) {
     const it = AV.getItem(id); if (!it || it.sold) return;
-    if (needsLogin()) return openDetail(id); // shows the sign-in prompt
+    if (needsLogin() || isMine(it)) return openDetail(id); // shows the sign-in prompt / "your listing" note
     const price = AV.salePrice(it);
     const body = AV.openModal(`<div class="bin-confirm">
         <div class="pu-item"><span class="pu-emoji" aria-hidden="true">${AV.esc(it.emoji || '📦')}</span>
@@ -238,13 +256,18 @@
         <div>
           <div class="cat">${AV.esc(it.category)}</div>
           <h2 style="letter-spacing:.06em">${AV.esc(it.name)}</h2>
+          <div id="listed-by">${listerHTML(it)}</div>
           <button class="btn outline small" type="button" id="copy-link" data-link="${AV.esc(itemLink(it.id))}" style="margin-bottom:10px">🔗 Copy link</button>
           <p>${AV.esc(it.description || 'No description provided.')}</p>
           <div class="bid-line">${offerLine(n)}</div>
           <div class="bid-amt" style="font-size:1.8rem">${AV.money(n ? it.currentBid : it.startBid)}</div>
           ${topHTML(it).replace('class="top-offer', 'id="top-offer" class="top-offer')}
           <div class="timer ${tl.ending && !closed ? 'ending' : ''}" data-ends="${it.endsAt}" ${it.sold ? 'data-sold="1"' : ''}>${timerText(it, tl, ' left')}</div>
-          ${closed ? `<p class="msg err">${it.sold ? 'This item has been sold.' : 'This auction has ended.'}</p>` : needsLogin() ? `
+          ${closed ? `<p class="msg err">${it.sold ? 'This item has been sold.' : 'This auction has ended.'}</p>` : isMine(it) ? `
+          <div class="login-box own-listing"><div class="login-ico" aria-hidden="true">🏷️</div><div><strong>This is your listing</strong>
+            <p class="muted">You can't make offers on your own item. Edit it, change the discount or mark it sold on the Listing tab.</p>
+            <div class="login-actions"><a class="btn" href="listing.html">Manage on Listing</a></div></div></div>
+          ${priceBlock(it)}` : needsLogin() ? `
           <div class="muted" style="font-size:.85rem;margin:6px 0">Offer ${AV.money(min)} or more.</div>
           ${loginBoxHTML('make an offer')}
           <hr style="border:0;border-top:1px solid var(--grey-light);margin:14px 0">
@@ -329,6 +352,7 @@
   AV.onAccount(a => {
     const key = [a.ready, a.session && a.session.user.id, a.profile && a.profile.display_name].join('|');
     if (key === lastAcct) return; const first = !lastAcct; lastAcct = key;
+    if (state.loaded) render();
     if (!first && openId && !document.querySelector('#av-modal input:focus')) openDetail(openId);
     else if (first && openId && a.ready) openDetail(openId);
   });
